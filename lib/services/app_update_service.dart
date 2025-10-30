@@ -33,6 +33,9 @@ class AppUpdateService {
     if (!enableAutoUpdate) return;
 
     try {
+      // Clean up old APK files from previous installations
+      _cleanupOldApkFiles();
+
       // Wait a bit before checking (let app load first)
       await Future.delayed(const Duration(seconds: 2));
 
@@ -205,6 +208,10 @@ class AppUpdateService {
 
       // Note: After this point, the system's package installer takes over
       // The app may be closed during installation
+
+      // DON'T delete immediately - let Android finish copying the file
+      // Cleanup will happen on next app launch instead (safer for slow devices)
+      // See _cleanupOldApkFiles() which runs on app startup
     } catch (e) {
       debugPrint('Error downloading/installing update: $e');
 
@@ -230,5 +237,29 @@ class AppUpdateService {
       barrierDismissible: false, // Mandatory update
       builder: (ctx) => UpdateDialog(updateInfo: updateInfo),
     );
+  }
+
+  /// Clean up old APK files (called on app startup)
+  ///
+  /// This is safe because:
+  /// 1. If installation succeeded, we're running the new version - old APK no longer needed
+  /// 2. If installation failed, user can download again
+  /// 3. Runs 3 seconds after startup to ensure Android released file handles
+  static void _cleanupOldApkFiles() {
+    Future.delayed(const Duration(seconds: 3), () async {
+      try {
+        final directory = await getTemporaryDirectory();
+        final apkFile = File('${directory.path}/app-update.apk');
+
+        if (await apkFile.exists()) {
+          // Try to delete - if file is still in use by system, this will fail silently
+          await apkFile.delete();
+          debugPrint('Cleaned up old APK file from previous update');
+        }
+      } catch (e) {
+        // Silent failure - file might still be in use, will be cleaned next time
+        debugPrint('Could not cleanup old APK (file may be in use): $e');
+      }
+    });
   }
 }
