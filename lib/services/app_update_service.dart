@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:r_upgrade/r_upgrade.dart';
+import 'package:dio/dio.dart';
+import 'package:open_file/open_file.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../core/widgets/premium_dialogs.dart';
 import '../features/update/update_dialog.dart';
 import '../features/update/download_progress_dialog.dart';
@@ -14,9 +16,9 @@ import '../features/update/download_progress_dialog.dart';
 /// This service checks for new versions, downloads APK files, and triggers installation.
 /// All operations are wrapped in try-catch to ensure app stability.
 class AppUpdateService {
-  // GitHub raw URL for version.json (you'll replace this with your actual URL)
+  // GitHub raw URL for version.json
   static const String _versionCheckUrl =
-      'https://raw.githubusercontent.com/YOUR_USERNAME/khair_ul_madaaris_library/main/version.json';
+      'https://raw.githubusercontent.com/HFZY-Developments/khair_ul_madaaris_library/main/version.json';
 
   // Feature flag to enable/disable auto-update
   static const bool enableAutoUpdate = true;
@@ -133,6 +135,22 @@ class AppUpdateService {
     try {
       final downloadUrl = updateInfo['downloadUrl'] as String;
 
+      // Request storage permission for Android 10 and below
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          if (context.mounted) {
+            await showPremiumErrorDialog(
+              context,
+              title: 'Permission Required',
+              message: 'Storage permission is needed to download updates.',
+              icon: Icons.error_rounded,
+            );
+          }
+          return;
+        }
+      }
+
       // Show download progress dialog
       if (!context.mounted) return;
 
@@ -152,55 +170,41 @@ class AppUpdateService {
         await file.delete();
       }
 
-      // Download APK using r_upgrade
+      // Download APK using Dio
       downloadStatus.value = 'Downloading update...';
 
-      int? upgradeId = await RUpgrade.upgrade(
+      final dio = Dio();
+      await dio.download(
         downloadUrl,
-        fileName: 'app-update.apk',
-        useDownloadManager: false,
-        installType: UpgradeInstallType.normal,
-        notificationStyle: NotificationStyle.planTime,
-        notificationVisibility: NotificationVisibility.VISIBILITY_VISIBLE,
-      );
-
-      if (upgradeId != null) {
-        // Listen to download progress
-        RUpgrade.stream.listen((DownloadInfo info) {
-          if (info.id == upgradeId) {
-            double progress = (info.percent ?? 0) / 100;
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final progress = received / total;
             downloadProgress.value = progress;
 
-            if (info.status == DownloadStatus.STATUS_SUCCESSFUL) {
-              downloadStatus.value = 'Download complete! Installing...';
-
-              // Close progress dialog after a short delay
-              Future.delayed(const Duration(milliseconds: 500), () {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              });
-
-              // Clean up: APK will be deleted by system after install
-            } else if (info.status == DownloadStatus.STATUS_FAILED) {
-              downloadStatus.value = 'Download failed';
-
-              // Show error
-              Future.delayed(const Duration(milliseconds: 500), () {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  showPremiumErrorDialog(
-                    context,
-                    title: 'Download Failed',
-                    message: 'Could not download update. Please check your internet connection.',
-                    icon: Icons.error_rounded,
-                  );
-                }
-              });
-            }
+            final percentage = (progress * 100).toStringAsFixed(0);
+            downloadStatus.value = 'Downloading... $percentage%';
           }
-        });
+        },
+      );
+
+      // Download complete
+      downloadStatus.value = 'Download complete! Installing...';
+      downloadProgress.value = 1.0;
+
+      // Close progress dialog
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (context.mounted) {
+        Navigator.pop(context);
       }
+
+      // Open APK file for installation
+      final result = await OpenFile.open(filePath);
+
+      debugPrint('Install result: ${result.message}');
+
+      // Note: After this point, the system's package installer takes over
+      // The app may be closed during installation
     } catch (e) {
       debugPrint('Error downloading/installing update: $e');
 
@@ -209,7 +213,7 @@ class AppUpdateService {
         await showPremiumErrorDialog(
           context,
           title: 'Update Failed',
-          message: 'Could not install update. Please try again later.',
+          message: 'Could not install update. Please try again later.\n\nError: ${e.toString()}',
           icon: Icons.error_rounded,
         );
       }

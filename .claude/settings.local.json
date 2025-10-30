@@ -7,7 +7,18 @@
       "Bash(del nul)",
       "Bash(git config:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(gh auth:*)",
+      "Bash(git remote:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter pub:*)",
+      "Read(//c/Users/Dell/AppData/Local/Pub/Cache/hosted/pub.dev/r_upgrade-0.4.2/android/**)",
+      "Bash(cat:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter build:*)"
     ],
     "deny": [],
     "ask": []
