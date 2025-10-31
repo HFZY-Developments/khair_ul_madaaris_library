@@ -1,0 +1,24 @@
+/// TEMPLATE FILE - Copy this to app_config.dart and fill in your actual credentials
+///
+/// Steps to set up:
+/// 1. Copy this file and rename it to: app_config.dart
+/// 2. Fill in your actual credentials below
+/// 3. NEVER commit app_config.dart to git (it's in .gitignore)
+/// 4. Share this template file with other developers, not your actual credentials
+///
+class AppConfig {
+  AppConfig._();
+
+  // Google Sheets Configuration - KEEP PRIVATE
+  // Get this from your Google Sheet URL: docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
+  static const String spreadsheetId = 'YOUR_SPREADSHEET_ID_HERE';
+
+  // Google OAuth Client ID - KEEP PRIVATE
+  // Get this from: https://console.cloud.google.com/apis/credentials
+  // It should look like: 123456789-abc123xyz.apps.googleusercontent.com
+  static const String serverClientId = 'YOUR_OAUTH_CLIENT_ID_HERE';
+
+  // Admin Password - KEEP PRIVATE
+  // Change this to a secure password for your admin panel
+  static const String adminPassword = 'YOUR_SECURE_PASSWORD_HERE';
+}

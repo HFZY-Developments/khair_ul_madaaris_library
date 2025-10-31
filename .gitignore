@@ -54,6 +54,9 @@ app.*.map.json
 **/keystore.properties
 **/key.properties
 
+# App configuration with sensitive credentials - NEVER COMMIT
+lib/core/constants/app_config.dart
+
 # Downloaded APK files for updates
 **/downloads/*.apk
 **/cache/*.apk

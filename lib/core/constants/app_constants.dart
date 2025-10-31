@@ -1,4 +1,10 @@
+import 'app_config.dart';
+
 /// App-wide constants and configuration
+///
+/// NOTE: Sensitive credentials (spreadsheet ID, OAuth client ID, admin password)
+/// are stored in app_config.dart which is excluded from git.
+/// Use app_config.dart.template to create your own app_config.dart file.
 class AppConstants {
   AppConstants._();
 
@@ -6,20 +12,17 @@ class AppConstants {
   static const String appName = 'Khair-ul-Madaaris Library';
   static const String appNameArabic = 'مكتبة خير المدارس';
   static const String appTagline = 'Premium Library Management';
-  static const String developerName =
-      'HFZY Developments'; // TODO: Update with your name
-  static const String developerEmail = 'hfzy.apps@gmail.com'; // TODO: Update
+  static const String developerName = 'HFZY Developments';
+  static const String developerEmail = 'hfzy.apps@gmail.com';
 
-  // Google Sheets Configuration
-  static const String spreadsheetId =
-      '1NabXmw_La-ejig_h615hzncBfcwDQIsyhDv0o1Kfn9c'; // TODO: Add your spreadsheet ID
+  // Google Sheets Configuration - SECURE (from app_config.dart)
+  static const String spreadsheetId = AppConfig.spreadsheetId;
   static const String bookInventorySheet = 'Book Inventory';
   static const String statsSheet = 'Statistics';
   static const String settingsSheet = 'Settings';
 
-  // Google OAuth
-  static const String serverClientId =
-      '698382210573-pgtlkqbvv9bnvk9bekv6qi2tkoll6fst.apps.googleusercontent.com'; // TODO: Add your OAuth client ID
+  // Google OAuth - SECURE (from app_config.dart)
+  static const String serverClientId = AppConfig.serverClientId;
 
   // API Rate Limiting (to stay within Google's limits)
   static const int maxRequestsPerMinute =
@@ -32,8 +35,8 @@ class AppConstants {
   static const Duration cacheExpiration = Duration(minutes: 5);
   static const Duration connectionCheckInterval = Duration(seconds: 10);
 
-  // Admin
-  static const String defaultAdminPassword = 'admin123';
+  // Admin - SECURE (from app_config.dart)
+  static const String defaultAdminPassword = AppConfig.adminPassword;
   static const String adminPasswordKey = 'admin_password';
 
   // SharedPreferences Keys

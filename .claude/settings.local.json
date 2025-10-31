@@ -28,7 +28,9 @@
       "Bash(adb install:*)",
       "Bash(adb logcat:*)",
       "Bash(adb shell am:*)",
-      "Bash(adb uninstall:*)"
+      "Bash(adb uninstall:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(git check-ignore:*)"
     ],
     "deny": [],
     "ask": []
