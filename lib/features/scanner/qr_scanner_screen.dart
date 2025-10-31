@@ -217,6 +217,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         print('DEBUG: Book not found');
         // Book not found
         if (widget.isAdmin) {
+          // VALIDATION: Only allow QR codes starting with "LIB" for new books
+          if (!qrCode.toUpperCase().startsWith('LIB')) {
+            print('DEBUG: Invalid QR code - does not start with LIB: $qrCode');
+            await showPremiumErrorDialog(
+              context,
+              title: 'Invalid Library Code',
+              message: 'Only library QR codes starting with "LIB" can be added to the system.\n\nScanned code: $qrCode\n\nPlease use official library QR codes only.',
+              icon: Icons.block_rounded,
+            );
+            setState(() => _isProcessing = false);
+            return;
+          }
           await _showAddBookDialog(qrCode);
         } else {
           await showPremiumErrorDialog(

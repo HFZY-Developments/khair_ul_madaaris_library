@@ -30,7 +30,9 @@
       "Bash(adb shell am:*)",
       "Bash(adb uninstall:*)",
       "Bash(flutter analyze:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(gh release list:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

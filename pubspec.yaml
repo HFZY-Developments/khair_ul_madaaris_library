@@ -2,7 +2,7 @@ name: khair_ul_madaaris_library
 description: "Premium Library Management System for Khair-ul-Madaaris"
 publish_to: 'none'
 
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ^3.8.1
