@@ -271,7 +271,7 @@ class SettingsScreen extends ConsumerWidget {
                       context: context,
                       isDark: isDark,
                       title: AppConstants.appName,
-                      subtitle: 'Version 1.0.0',
+                      subtitle: 'Version 1.0.1',
                       icon: Icons.apps_rounded,
                       trailing: Container(
                         padding: EdgeInsets.symmetric(

@@ -6,11 +6,7 @@
   "fileSize": "33.5 MB",
   "mandatory": false,
   "changelog": [
-    "Complete library management system",
-    "QR code book scanning",
-    "Admin dashboard with statistics",
-    "Dark mode support",
-    "Google Sheets integration"
+    "Update system Implemented"
   ],
   "minAndroidVersion": 21,
   "sha256": ""
