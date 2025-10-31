@@ -69,3 +69,4 @@ app.*.map.json
 # Generated files
 *.g.dart
 *.freezed.dart
+CODE_REVIEW_REPORT.md
