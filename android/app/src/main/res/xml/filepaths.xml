@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Allow access to app's cache directory (where we download APKs) -->
+    <cache-path name="cache" path="/" />
+
+    <!-- Allow access to app's files directory -->
+    <files-path name="files" path="/" />
+
+    <!-- Allow access to external cache directory -->
+    <external-cache-path name="external_cache" path="/" />
+</paths>
