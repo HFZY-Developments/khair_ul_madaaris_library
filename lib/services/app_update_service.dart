@@ -287,7 +287,7 @@ class AppUpdateService {
           await showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (ctx) => const InstallingDialog(),
+            builder: (ctx) => InstallingDialog(updateInfo: updateInfo),
           );
         }
       } catch (e) {

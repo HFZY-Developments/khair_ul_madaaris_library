@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/premium_dialogs.dart';
+import '../../services/app_update_service.dart';
 import 'liquid_background.dart';
 
 /// Dialog shown while installer is open - detects when user comes back
 class InstallingDialog extends StatefulWidget {
-  final VoidCallback? onUserReturnedFromInstaller;
+  final Map<String, dynamic> updateInfo;
 
   const InstallingDialog({
     super.key,
-    this.onUserReturnedFromInstaller,
+    required this.updateInfo,
   });
 
   @override
@@ -21,6 +21,7 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
   bool _hasDetectedReturn = false;
   bool _appWentToBackground = false;
   bool _isWaitingForInstaller = true;
+  bool _installationFailed = false;
 
   @override
   void initState() {
@@ -94,28 +95,17 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
     }
 
     _hasDetectedReturn = true;
-    debugPrint('🚨 Showing cancellation error dialog');
+    debugPrint('🚨 Showing installation failed state');
 
     // User came back from installer - they either installed or cancelled
     // If they installed, app would restart (we wouldn't be here)
     // So they must have cancelled
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
-        debugPrint('🔴 Closing InstallingDialog');
-        Navigator.of(context).pop();
-
-        // Small delay before showing error
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            debugPrint('📢 Showing Installation Cancelled error');
-            showPremiumErrorDialog(
-              context,
-              title: 'Installation Cancelled',
-              message: 'The update was not installed. You can try downloading again from Settings.',
-              icon: Icons.cancel_rounded,
-            );
-          }
+        setState(() {
+          _installationFailed = true;
         });
+        debugPrint('✅ Updated UI to show Installation Failed with Try Again button');
       }
     });
   }
@@ -125,7 +115,7 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
-      canPop: false,
+      canPop: _installationFailed,
       child: Dialog(
         backgroundColor: Colors.transparent,
         child: ClipRRect(
@@ -134,7 +124,9 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28.r),
               border: Border.all(
-                color: AppColors.primaryTeal.withValues(alpha: 0.4),
+                color: _installationFailed
+                    ? Colors.red.withValues(alpha: 0.4)
+                    : AppColors.primaryTeal.withValues(alpha: 0.4),
                 width: 2,
               ),
             ),
@@ -142,54 +134,163 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
               isDark: isDark,
               child: Padding(
                 padding: EdgeInsets.all(32.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80.w,
-                      height: 80.w,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [AppColors.primaryTeal, AppColors.primaryLime],
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.system_update_alt_rounded,
-                        size: 40.sp,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: 24.h),
-                    Text(
-                      'Installing Update',
-                      style: TextStyle(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : AppColors.primaryDarkBlue,
-                      ),
-                    ),
-                    SizedBox(height: 12.h),
-                    Text(
-                      'Please complete the installation in the system installer',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.grey[300] : Colors.grey[700],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 24.h),
-                    CircularProgressIndicator(
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
-                      strokeWidth: 3.w,
-                    ),
-                  ],
-                ),
+                child: _installationFailed
+                    ? _buildFailedState(context, isDark)
+                    : _buildInstallingState(context, isDark),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInstallingState(BuildContext context, bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 80.w,
+          height: 80.w,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [AppColors.primaryTeal, AppColors.primaryLime],
+            ),
+          ),
+          child: Icon(
+            Icons.system_update_alt_rounded,
+            size: 40.sp,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 24.h),
+        Text(
+          'Installing Update',
+          style: TextStyle(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : AppColors.primaryDarkBlue,
+          ),
+        ),
+        SizedBox(height: 12.h),
+        Text(
+          'Please complete the installation in the system installer',
+          style: TextStyle(
+            fontSize: 14.sp,
+            color: isDark ? Colors.grey[300] : Colors.grey[700],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 24.h),
+        CircularProgressIndicator(
+          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
+          strokeWidth: 3.w,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFailedState(BuildContext context, bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 80.w,
+          height: 80.w,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                Colors.red.shade400,
+                Colors.red.shade600,
+              ],
+            ),
+          ),
+          child: Icon(
+            Icons.error_outline_rounded,
+            size: 40.sp,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 24.h),
+        Text(
+          'Installation Failed',
+          style: TextStyle(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : AppColors.primaryDarkBlue,
+          ),
+        ),
+        SizedBox(height: 12.h),
+        Text(
+          'The update was not installed. Please try again.',
+          style: TextStyle(
+            fontSize: 14.sp,
+            color: isDark ? Colors.grey[300] : Colors.grey[700],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 32.h),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                  side: BorderSide(
+                    color: isDark ? Colors.grey[600]! : Colors.grey[400]!,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+
+                  // Retry download and install
+                  await Future.delayed(const Duration(milliseconds: 300));
+                  if (context.mounted) {
+                    await AppUpdateService.downloadAndInstall(context, widget.updateInfo);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                  backgroundColor: AppColors.primaryTeal,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                ),
+                child: Text(
+                  'Try Again',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
