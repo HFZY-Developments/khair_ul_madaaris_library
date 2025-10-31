@@ -9,6 +9,7 @@ import '../../core/utils/responsive.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/debounced_button.dart';
 import '../../core/widgets/premium_dialogs.dart';
+import '../../core/widgets/network_indicator.dart';
 import '../../models/book.dart';
 import '../../providers/app_state_provider.dart';
 import '../../services/google_sheets_service.dart';
@@ -137,10 +138,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 ref.read(themeModeProvider.notifier).toggleTheme(context);
               },
             ),
-            // Donation button
+            // Donation button with attention-grabbing shake animation
             IconButton(
               iconSize: iconSize,
-              icon: Icon(Icons.favorite_rounded, color: Colors.red[400]),
+              icon: Icon(Icons.favorite_rounded, color: Colors.red[400])
+                  .animate(onPlay: (controller) => controller.repeat())
+                  .shake(
+                    duration: 1500.ms,
+                    hz: 3,
+                    curve: Curves.easeInOut,
+                  )
+                  .then(delay: 2000.ms), // Pause between shake cycles
               onPressed: () {
                 HapticFeedback.mediumImpact();
                 Navigator.push(
@@ -169,21 +177,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           ];
         }(),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // FLUID SCALE FACTOR for ALL body dimensions
-            final screenWidth = constraints.maxWidth;
-            final screenHeight = MediaQuery.of(context).size.height;
-            const double refWidth = 428.0;
-            final double scale = (screenWidth / refWidth).clamp(0.75, 2.5);
+      body: Column(
+        children: [
+          // Network indicator at the top
+          const NetworkIndicator(),
 
-            // All dimensions now use fluid scaling!
-            final horizontalPadding = (24.0 * scale).clamp(16.0, 36.0);
-            final verticalSpacing = (24.0 * scale).clamp(16.0, 32.0);
-            final logoSpacing = (32.0 * scale).clamp(24.0, 44.0);
+          // Main content
+          Expanded(
+            child: SafeArea(
+              top: false, // NetworkIndicator handles top safe area
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // FLUID SCALE FACTOR for ALL body dimensions
+                  final screenWidth = constraints.maxWidth;
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  const double refWidth = 428.0;
+                  final double scale = (screenWidth / refWidth).clamp(0.75, 2.5);
 
-            return SingleChildScrollView(
+                  // All dimensions now use fluid scaling!
+                  final horizontalPadding = (24.0 * scale).clamp(16.0, 36.0);
+                  final verticalSpacing = (24.0 * scale).clamp(16.0, 32.0);
+                  final logoSpacing = (32.0 * scale).clamp(24.0, 44.0);
+
+                  return SingleChildScrollView(
               padding: EdgeInsets.symmetric(
                 horizontal: horizontalPadding,
                 vertical: (16.0 * scale).clamp(12.0, 24.0),
@@ -354,6 +370,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             );
           },
         ),
+              ),
+            ),
+        ],
       ),
     );
   }

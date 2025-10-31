@@ -229,7 +229,7 @@ class _DonationScreenState extends State<DonationScreen> with TickerProviderStat
     return Column(
       children: [
         Text(
-          'Support Development',
+          'Support Developer',
           style: TextStyle(
             fontSize: 38.sp,
             fontWeight: FontWeight.w700,

@@ -159,88 +159,148 @@ class UpdateDialog extends StatelessWidget {
 
                 SizedBox(height: 24.h),
 
-                // Changelog section
+                // Changelog section - No scrolling, elegant fade-in animations
                 if (changelog.isNotEmpty) ...[
                   Container(
                     width: double.infinity,
-                    constraints: BoxConstraints(
-                      maxHeight: 200.h,
-                    ),
                     padding: EdgeInsets.all(20.w),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(16.r),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? [
+                                Colors.white.withValues(alpha: 0.03),
+                                Colors.white.withValues(alpha: 0.08),
+                              ]
+                            : [
+                                Colors.black.withValues(alpha: 0.02),
+                                Colors.black.withValues(alpha: 0.05),
+                              ],
+                      ),
+                      borderRadius: BorderRadius.circular(20.r),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : Colors.black.withValues(alpha: 0.1),
-                        width: 1,
+                            ? AppColors.primaryTeal.withValues(alpha: 0.2)
+                            : AppColors.primaryTeal.withValues(alpha: 0.15),
+                        width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryTeal.withValues(alpha: 0.1),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Header with animated icon
                         Row(
                           children: [
-                            Icon(
-                              Icons.article_rounded,
-                              color: AppColors.primaryTeal,
-                              size: 20.sp,
-                            ),
-                            SizedBox(width: 8.w),
+                            Container(
+                              padding: EdgeInsets.all(8.w),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    AppColors.primaryTeal,
+                                    AppColors.primaryLime,
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primaryTeal.withValues(alpha: 0.3),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.auto_awesome_rounded,
+                                color: Colors.white,
+                                size: 18.sp,
+                              ),
+                            )
+                                .animate(onPlay: (controller) => controller.repeat())
+                                .shimmer(duration: 2000.ms, color: AppColors.primaryLime.withValues(alpha: 0.3)),
+                            SizedBox(width: 12.w),
                             Text(
                               'What\'s New',
                               style: TextStyle(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? Colors.white : AppColors.primaryDarkBlue,
+                                fontSize: 17.sp,
+                                fontWeight: FontWeight.w800,
+                                foreground: Paint()
+                                  ..shader = const LinearGradient(
+                                    colors: [
+                                      AppColors.primaryTeal,
+                                      AppColors.primaryLime,
+                                    ],
+                                  ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                               ),
                             ),
                           ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Expanded(
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: changelog.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: EdgeInsets.only(bottom: 10.h),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: EdgeInsets.only(top: 6.h),
-                                      width: 6.w,
-                                      height: 6.h,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryTeal,
-                                        shape: BoxShape.circle,
-                                      ),
+                        ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.3, end: 0),
+                        SizedBox(height: 18.h),
+                        // Changelog items - All visible, no scrolling, staggered fade-in
+                        ...List.generate(
+                          changelog.length,
+                          (index) => Padding(
+                            padding: EdgeInsets.only(bottom: index < changelog.length - 1 ? 14.h : 0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Animated gradient dot
+                                Container(
+                                  margin: EdgeInsets.only(top: 6.h),
+                                  width: 8.w,
+                                  height: 8.h,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.primaryTeal,
+                                        AppColors.primaryLime,
+                                      ],
                                     ),
-                                    SizedBox(width: 12.w),
-                                    Expanded(
-                                      child: Text(
-                                        changelog[index],
-                                        style: TextStyle(
-                                          fontSize: 13.sp,
-                                          color: isDark ? Colors.grey[300] : Colors.grey[700],
-                                          height: 1.4,
-                                        ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primaryTeal.withValues(alpha: 0.4),
+                                        blurRadius: 4,
+                                        spreadRadius: 1,
                                       ),
+                                    ],
+                                  ),
+                                )
+                                    .animate(delay: (450 + index * 100).ms)
+                                    .scale(begin: const Offset(0, 0), curve: Curves.elasticOut),
+                                SizedBox(width: 14.w),
+                                // Text with fade and slide
+                                Expanded(
+                                  child: Text(
+                                    changelog[index],
+                                    style: TextStyle(
+                                      fontSize: 13.5.sp,
+                                      color: isDark ? Colors.grey[200] : Colors.grey[800],
+                                      height: 1.5,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.2,
                                     ),
-                                  ],
+                                  )
+                                      .animate(delay: (450 + index * 100).ms)
+                                      .fadeIn(duration: 600.ms, curve: Curves.easeOut)
+                                      .slideX(begin: -0.2, end: 0, curve: Curves.easeOut),
                                 ),
-                              ).animate(delay: (index * 50).ms).fadeIn().slideX(begin: -0.2, end: 0);
-                            },
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(delay: 400.ms),
-                  SizedBox(height: 20.h),
+                  ),
+                  SizedBox(height: 22.h),
                 ],
 
                 // Info row
@@ -293,10 +353,14 @@ class UpdateDialog extends StatelessWidget {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
                         HapticFeedback.mediumImpact();
-                        Navigator.pop(context); // Close this dialog
-                        AppUpdateService.downloadAndInstall(context, updateInfo);
+                        // Don't close this dialog yet - let download service handle navigation
+                        await AppUpdateService.downloadAndInstall(context, updateInfo);
+                        // Close update dialog after download completes/fails
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
                       },
                       borderRadius: BorderRadius.circular(16.r),
                       child: Row(

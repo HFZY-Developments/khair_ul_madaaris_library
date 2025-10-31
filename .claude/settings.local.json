@@ -23,7 +23,12 @@
       "Read(//c/Users/Dell/AppData/Local/Pub/Cache/hosted/pub.dev/install_plugin-2.1.0/android/**)",
       "Bash(del \"c:\\Users\\Dell\\Documents\\flutter projects\\khair_ul_madaaris_library\\lib\\services\\permission_service.dart\")",
       "Bash(cmd /c copy \"build\\app\\outputs\\flutter-apk\\app-release.apk\" \"app-v1.0.0.apk\")",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb install:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb shell am:*)",
+      "Bash(adb uninstall:*)"
     ],
     "deny": [],
     "ask": []

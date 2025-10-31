@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/widgets/premium_dialogs.dart';
 import '../features/update/update_dialog.dart';
 import '../features/update/download_progress_dialog.dart';
@@ -64,7 +65,23 @@ class AppUpdateService {
   /// Manual update check (called from Settings button)
   static Future<void> checkForUpdatesManual(BuildContext context) async {
     try {
+      // Check network connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        // No network connection
+        if (context.mounted) {
+          await showPremiumErrorDialog(
+            context,
+            title: 'No Network Connection',
+            message: 'Please check your internet connection and try again.',
+            icon: Icons.wifi_off_rounded,
+          );
+        }
+        return;
+      }
+
       // Show loading
+      if (!context.mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -158,6 +175,9 @@ class AppUpdateService {
     BuildContext context,
     Map<String, dynamic> updateInfo,
   ) async {
+    // Capture navigator before any async operations
+    final navigator = Navigator.of(context);
+
     try {
       final downloadUrl = updateInfo['downloadUrl'] as String;
 
@@ -201,7 +221,18 @@ class AppUpdateService {
       downloadStatus.value = 'Downloading update...';
       debugPrint('⬇️  Starting download from: $downloadUrl');
 
-      final dio = Dio();
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 30),
+          validateStatus: (status) {
+            // Reject 404 and other errors immediately
+            return status != null && status >= 200 && status < 300;
+          },
+        ),
+      );
+
       await dio.download(
         downloadUrl,
         filePath,
@@ -241,9 +272,7 @@ class AppUpdateService {
 
       // Close progress dialog
       await Future.delayed(const Duration(milliseconds: 500));
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
+      navigator.pop();
 
       // Install APK using platform channel (native Android method)
       debugPrint('📦 Opening installer for: $filePath');
@@ -255,7 +284,7 @@ class AppUpdateService {
 
         // Show dialog that detects if user cancels
         if (context.mounted) {
-          showDialog(
+          await showDialog(
             context: context,
             barrierDismissible: false,
             builder: (ctx) => const InstallingDialog(),
@@ -303,26 +332,57 @@ class AppUpdateService {
         message = 'The download was cancelled. You can try again from Settings.';
       }
 
-      if (context.mounted) {
-        Navigator.pop(context); // Close progress dialog
-        await showPremiumErrorDialog(
-          context,
-          title: title,
-          message: message,
-          icon: Icons.cloud_off_rounded,
-        );
+      // Close progress dialog and show error
+      try {
+        debugPrint('🔴 Closing download dialog...');
+        navigator.pop();
+        debugPrint('✅ Download dialog closed');
+      } catch (e) {
+        debugPrint('❌ Failed to close dialog: $e');
+      }
+
+      // Small delay to let dialog close
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('📢 Attempting to show error dialog. context.mounted: ${context.mounted}');
+
+      try {
+        if (context.mounted) {
+          debugPrint('✅ Showing error dialog: $title');
+          await showPremiumErrorDialog(
+            context,
+            title: title,
+            message: message,
+            icon: Icons.cloud_off_rounded,
+          );
+          debugPrint('✅ Error dialog shown successfully');
+        } else {
+          debugPrint('❌ Cannot show error - context not mounted');
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to show error dialog: $e');
       }
     } catch (e) {
       debugPrint('Unexpected error during update: $e');
 
+      // Close progress dialog and show error
+      navigator.pop();
+
+      // Small delay to let dialog close
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('📢 Attempting to show error dialog. context.mounted: ${context.mounted}');
+
       if (context.mounted) {
-        Navigator.pop(context); // Close progress dialog
+        debugPrint('✅ Showing unexpected error dialog');
         await showPremiumErrorDialog(
           context,
           title: 'Update Failed',
           message: 'An unexpected error occurred. Please try again later.',
           icon: Icons.error_rounded,
         );
+      } else {
+        debugPrint('❌ Cannot show error - context not mounted');
       }
     }
   }
