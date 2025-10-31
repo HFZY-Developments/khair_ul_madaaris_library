@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/gradient_button.dart';
 import '../../services/app_update_service.dart';
+import 'liquid_background.dart';
 
 /// Premium-themed update dialog
 /// Matches the app's existing design language
@@ -26,40 +26,31 @@ class UpdateDialog extends StatelessWidget {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    const Color(0xFF1a1a1a),
-                    const Color(0xFF0f0f0f),
-                  ]
-                : [
-                    Colors.white,
-                    Colors.grey[50]!,
-                  ],
-          ),
-          borderRadius: BorderRadius.circular(28.r),
-          border: Border.all(
-            color: isDark
-                ? AppColors.primaryTeal.withOpacity(0.3)
-                : AppColors.primaryTeal.withOpacity(0.2),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryTeal.withOpacity(0.3),
-              blurRadius: 30,
-              offset: const Offset(0, 15),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28.r),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28.r),
+            border: Border.all(
+              color: isDark
+                  ? AppColors.primaryTeal.withValues(alpha: 0.4)
+                  : AppColors.primaryTeal.withValues(alpha: 0.3),
+              width: 2,
             ),
-          ],
-        ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(28.w),
-            child: Column(
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryTeal.withValues(alpha: 0.4),
+                blurRadius: 40,
+                offset: const Offset(0, 15),
+              ),
+            ],
+          ),
+          child: LiquidBackground(
+            isDark: isDark,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(28.w),
+                child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Icon with glow effect
@@ -68,7 +59,7 @@ class UpdateDialog extends StatelessWidget {
                   height: 100.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
                         AppColors.primaryTeal,
                         AppColors.primaryLime,
@@ -76,7 +67,7 @@ class UpdateDialog extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primaryTeal.withOpacity(0.5),
+                        color: AppColors.primaryTeal.withValues(alpha: 0.5),
                         blurRadius: 40,
                         spreadRadius: 10,
                       ),
@@ -89,7 +80,17 @@ class UpdateDialog extends StatelessWidget {
                   ),
                 )
                     .animate(onPlay: (controller) => controller.repeat())
-                    .shimmer(duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
+                    .scale(
+                      duration: 2000.ms,
+                      begin: const Offset(1, 1),
+                      end: const Offset(1.05, 1.05),
+                    )
+                    .then()
+                    .scale(
+                      duration: 2000.ms,
+                      begin: const Offset(1.05, 1.05),
+                      end: const Offset(1, 1),
+                    ),
 
                 SizedBox(height: 24.h),
 
@@ -112,13 +113,13 @@ class UpdateDialog extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primaryTeal.withOpacity(0.2),
-                        AppColors.primaryLime.withOpacity(0.2),
+                        AppColors.primaryTeal.withValues(alpha: 0.2),
+                        AppColors.primaryLime.withValues(alpha: 0.2),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20.r),
                     border: Border.all(
-                      color: AppColors.primaryTeal.withOpacity(0.5),
+                      color: AppColors.primaryTeal.withValues(alpha: 0.5),
                       width: 1.5,
                     ),
                   ),
@@ -168,13 +169,13 @@ class UpdateDialog extends StatelessWidget {
                     padding: EdgeInsets.all(20.w),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.black.withOpacity(0.03),
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.03),
                       borderRadius: BorderRadius.circular(16.r),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.black.withOpacity(0.1),
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.black.withValues(alpha: 0.1),
                         width: 1,
                       ),
                     ),
@@ -264,55 +265,131 @@ class UpdateDialog extends StatelessWidget {
 
                 SizedBox(height: 28.h),
 
-                // Download button
-                GradientButton(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.pop(context); // Close this dialog
-                    AppUpdateService.downloadAndInstall(context, updateInfo);
-                  },
-                  text: 'DOWNLOAD UPDATE',
-                  icon: Icons.download_rounded,
-                ),
-
-                SizedBox(height: 12.h),
-
-                // Important note
+                // Download button - Enhanced with better text handling
                 Container(
-                  padding: EdgeInsets.all(12.w),
+                  width: double.infinity,
+                  height: 56.h,
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: Colors.orange.withOpacity(0.3),
-                      width: 1,
+                    borderRadius: BorderRadius.circular(16.r),
+                    gradient: const LinearGradient(
+                      colors: [
+                        AppColors.primaryTeal,
+                        AppColors.primaryLime,
+                      ],
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryTeal.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: AppColors.primaryLime.withValues(alpha: 0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        Navigator.pop(context); // Close this dialog
+                        AppUpdateService.downloadAndInstall(context, updateInfo);
+                      },
+                      borderRadius: BorderRadius.circular(16.r),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.download_rounded,
+                            color: Colors.white,
+                            size: 24.sp,
+                          ),
+                          SizedBox(width: 12.w),
+                          Flexible(
+                            child: Text(
+                              'Download Update',
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                    .animate()
+                    .fadeIn(delay: 600.ms)
+                    .scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1)),
+
+                SizedBox(height: 16.h),
+
+                // Important note - Enhanced with glassmorphism
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.withValues(alpha: 0.15),
+                        Colors.deepOrange.withValues(alpha: 0.15),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14.r),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.info_rounded,
-                        color: Colors.orange,
-                        size: 20.sp,
+                      Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.priority_high_rounded,
+                          color: Colors.orange,
+                          size: 20.sp,
+                        ),
                       ),
-                      SizedBox(width: 12.w),
+                      SizedBox(width: 14.w),
                       Expanded(
                         child: Text(
                           'Update required to continue using the app',
                           style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5.sp,
+                            color: Colors.orange.shade700,
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.2, end: 0),
+                ],
+              ),
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -325,10 +402,10 @@ class UpdateDialog extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
           width: 1,
         ),
       ),

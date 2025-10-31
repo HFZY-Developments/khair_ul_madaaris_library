@@ -18,7 +18,12 @@
       "Read(//c/Users/Dell/AppData/Local/Pub/Cache/hosted/pub.dev/r_upgrade-0.4.2/android/**)",
       "Bash(cat:*)",
       "Bash(flutter clean:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(copy \"build\\app\\outputs\\flutter-apk\\app-release.apk\" \"app-v1.0.0.apk\")",
+      "Read(//c/Users/Dell/AppData/Local/Pub/Cache/hosted/pub.dev/install_plugin-2.1.0/android/**)",
+      "Bash(del \"c:\\Users\\Dell\\Documents\\flutter projects\\khair_ul_madaaris_library\\lib\\services\\permission_service.dart\")",
+      "Bash(cmd /c copy \"build\\app\\outputs\\flutter-apk\\app-release.apk\" \"app-v1.0.0.apk\")",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

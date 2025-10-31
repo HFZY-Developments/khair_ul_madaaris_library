@@ -2,7 +2,7 @@ name: khair_ul_madaaris_library
 description: "Premium Library Management System for Khair-ul-Madaaris"
 publish_to: 'none'
 
-version: 1.0.1+2
+version: 1.0.0+1
 
 environment:
   sdk: ^3.8.1
@@ -62,8 +62,6 @@ dependencies:
   package_info_plus: ^8.1.2
   path_provider: ^2.1.5
   dio: ^5.7.0
-  open_file: ^3.5.10
-  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
