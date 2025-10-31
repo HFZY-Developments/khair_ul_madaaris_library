@@ -284,11 +284,17 @@ class AppUpdateService {
 
         // Show dialog that detects if user cancels
         if (context.mounted) {
-          await showDialog(
+          final shouldRetry = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
             builder: (ctx) => InstallingDialog(updateInfo: updateInfo),
           );
+
+          // If user pressed "Try Again", retry the download
+          if (shouldRetry == true && context.mounted) {
+            debugPrint('🔄 User requested retry - restarting download');
+            await downloadAndInstall(context, updateInfo);
+          }
         }
       } catch (e) {
         debugPrint('❌ Failed to open installer: $e');

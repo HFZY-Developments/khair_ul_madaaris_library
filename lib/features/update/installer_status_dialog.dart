@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/constants/app_colors.dart';
-import '../../services/app_update_service.dart';
 import 'liquid_background.dart';
 
 /// Dialog shown while installer is open - detects when user comes back
@@ -237,7 +236,7 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
             Expanded(
               child: OutlinedButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
+                  Navigator.of(context).pop(false); // Return false = cancelled
                 },
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -262,14 +261,8 @@ class _InstallingDialogState extends State<InstallingDialog> with WidgetsBinding
             SizedBox(width: 12.w),
             Expanded(
               child: ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-
-                  // Retry download and install
-                  await Future.delayed(const Duration(milliseconds: 300));
-                  if (context.mounted) {
-                    await AppUpdateService.downloadAndInstall(context, widget.updateInfo);
-                  }
+                onPressed: () {
+                  Navigator.of(context).pop(true); // Return true = retry requested
                 },
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16.h),
