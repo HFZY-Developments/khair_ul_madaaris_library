@@ -53,14 +53,18 @@ class SettingsScreen extends ConsumerWidget {
                   context: context,
                   isDark: isDark,
                   title: 'Dark Mode',
-                  subtitle: themeMode == ThemeMode.dark ? 'Dark theme active' : 'Light theme active',
-                  icon: themeMode == ThemeMode.dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  subtitle: themeMode == ThemeMode.dark
+                      ? 'Dark theme active'
+                      : 'Light theme active',
+                  icon: themeMode == ThemeMode.dark
+                      ? Icons.dark_mode_rounded
+                      : Icons.light_mode_rounded,
                   value: themeMode == ThemeMode.dark,
                   onChanged: (value) {
                     HapticFeedback.lightImpact();
-                    ref.read(themeModeProvider.notifier).setThemeMode(
-                      value ? ThemeMode.dark : ThemeMode.light,
-                    );
+                    ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
                   },
                 ),
               ],
@@ -70,203 +74,255 @@ class SettingsScreen extends ConsumerWidget {
 
             // Account Section
             _buildEnhancedSection(
-              context: context,
-              isDark: isDark,
-              title: 'ACCOUNT',
-              icon: Icons.person_rounded,
-              children: [
-                connectionStatus.when(
-                  data: (connected) => _buildPremiumTile(
-                    context: context,
-                    isDark: isDark,
-                    title: 'Google Sheets',
-                    subtitle: connected ? 'Connected & synced' : 'Disconnected',
-                    icon: Icons.cloud_rounded,
-                    trailing: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        color: (connected ? AppColors.statusAvailable : AppColors.statusOverdue).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: connected ? AppColors.statusAvailable : AppColors.statusOverdue,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            connected ? Icons.check_circle_rounded : Icons.error_rounded,
-                            color: connected ? AppColors.statusAvailable : AppColors.statusOverdue,
-                            size: 16.sp,
-                          ),
-                          SizedBox(width: 6.w),
-                          Text(
-                            connected ? 'Active' : 'Inactive',
-                            style: TextStyle(
-                              color: connected ? AppColors.statusAvailable : AppColors.statusOverdue,
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    onTap: null,
-                  ),
-                  loading: () => _buildPremiumTile(
-                    context: context,
-                    isDark: isDark,
-                    title: 'Google Sheets',
-                    subtitle: 'Checking connection...',
-                    icon: Icons.cloud_rounded,
-                    trailing: SizedBox(
-                      width: 20.w,
-                      height: 20.h,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    onTap: null,
-                  ),
-                  error: (_, __) => _buildPremiumTile(
-                    context: context,
-                    isDark: isDark,
-                    title: 'Google Sheets',
-                    subtitle: 'Connection error',
-                    icon: Icons.cloud_off_rounded,
-                    trailing: Icon(Icons.error_rounded, color: AppColors.statusOverdue),
-                    onTap: null,
-                  ),
-                ),
-                _buildPremiumTile(
                   context: context,
                   isDark: isDark,
-                  title: 'Sign Out',
-                  subtitle: 'Log out of your account',
-                  icon: Icons.logout_rounded,
-                  trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp),
-                  onTap: () => _showSignOutDialog(context, ref),
-                ),
-              ],
-            ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideY(begin: 0.1, end: 0),
+                  title: 'ACCOUNT',
+                  icon: Icons.person_rounded,
+                  children: [
+                    connectionStatus.when(
+                      data: (connected) => _buildPremiumTile(
+                        context: context,
+                        isDark: isDark,
+                        title: 'Google Sheets',
+                        subtitle: connected
+                            ? 'Connected & synced'
+                            : 'Disconnected',
+                        icon: Icons.cloud_rounded,
+                        trailing: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12.w,
+                            vertical: 6.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                (connected
+                                        ? AppColors.statusAvailable
+                                        : AppColors.statusOverdue)
+                                    .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: connected
+                                  ? AppColors.statusAvailable
+                                  : AppColors.statusOverdue,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                connected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.error_rounded,
+                                color: connected
+                                    ? AppColors.statusAvailable
+                                    : AppColors.statusOverdue,
+                                size: 16.sp,
+                              ),
+                              SizedBox(width: 6.w),
+                              Text(
+                                connected ? 'Active' : 'Inactive',
+                                style: TextStyle(
+                                  color: connected
+                                      ? AppColors.statusAvailable
+                                      : AppColors.statusOverdue,
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        onTap: null,
+                      ),
+                      loading: () => _buildPremiumTile(
+                        context: context,
+                        isDark: isDark,
+                        title: 'Google Sheets',
+                        subtitle: 'Checking connection...',
+                        icon: Icons.cloud_rounded,
+                        trailing: SizedBox(
+                          width: 20.w,
+                          height: 20.h,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        onTap: null,
+                      ),
+                      error: (_, __) => _buildPremiumTile(
+                        context: context,
+                        isDark: isDark,
+                        title: 'Google Sheets',
+                        subtitle: 'Connection error',
+                        icon: Icons.cloud_off_rounded,
+                        trailing: Icon(
+                          Icons.error_rounded,
+                          color: AppColors.statusOverdue,
+                        ),
+                        onTap: null,
+                      ),
+                    ),
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: 'Sign Out',
+                      subtitle: 'Log out of your account',
+                      icon: Icons.logout_rounded,
+                      trailing: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16.sp,
+                      ),
+                      onTap: () => _showSignOutDialog(context, ref),
+                    ),
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 100.ms)
+                .slideY(begin: 0.1, end: 0),
 
             SizedBox(height: 16.h),
 
             // Admin Section
             if (isAdmin)
               _buildEnhancedSection(
-                context: context,
-                isDark: isDark,
-                title: 'ADMIN',
-                icon: Icons.admin_panel_settings_rounded,
-                children: [
-                  _buildPremiumTile(
                     context: context,
                     isDark: isDark,
-                    title: 'Change Password',
-                    subtitle: 'Update admin password',
-                    icon: Icons.lock_rounded,
-                    trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp),
-                    onTap: () => _showChangePasswordDialog(context, ref),
-                  ),
-                ],
-              ).animate().fadeIn(duration: 300.ms, delay: 200.ms).slideY(begin: 0.1, end: 0),
+                    title: 'ADMIN',
+                    icon: Icons.admin_panel_settings_rounded,
+                    children: [
+                      _buildPremiumTile(
+                        context: context,
+                        isDark: isDark,
+                        title: 'Change Password',
+                        subtitle: 'Update admin password',
+                        icon: Icons.lock_rounded,
+                        trailing: Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16.sp,
+                        ),
+                        onTap: () => _showChangePasswordDialog(context, ref),
+                      ),
+                    ],
+                  )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 200.ms)
+                  .slideY(begin: 0.1, end: 0),
 
             if (isAdmin) SizedBox(height: 16.h),
 
             // Support Section
             _buildEnhancedSection(
-              context: context,
-              isDark: isDark,
-              title: 'SUPPORT',
-              icon: Icons.help_rounded,
-              children: [
-                _buildPremiumTile(
                   context: context,
                   isDark: isDark,
-                  title: 'Contact Support',
-                  subtitle: AppConstants.helpEmail,
-                  icon: Icons.email_rounded,
-                  trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _launchURL('mailto:${AppConstants.helpEmail}');
-                  },
-                ),
-                _buildPremiumTile(
-                  context: context,
-                  isDark: isDark,
-                  title: 'Donate to Developer',
-                  subtitle: 'Support free app development',
-                  icon: Icons.favorite_rounded,
-                  iconColor: Colors.red,
-                  trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp),
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const DonationScreen()),
-                    );
-                  },
-                ),
-              ],
-            ).animate().fadeIn(duration: 300.ms, delay: isAdmin ? 300.ms : 200.ms).slideY(begin: 0.1, end: 0),
+                  title: 'SUPPORT',
+                  icon: Icons.help_rounded,
+                  children: [
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: 'Contact Support',
+                      subtitle: AppConstants.helpEmail,
+                      icon: Icons.email_rounded,
+                      trailing: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16.sp,
+                      ),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _launchURL('mailto:${AppConstants.helpEmail}');
+                      },
+                    ),
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: 'Donate to Developer',
+                      subtitle: 'Support free app development',
+                      icon: Icons.favorite_rounded,
+                      iconColor: Colors.red,
+                      trailing: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16.sp,
+                      ),
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DonationScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: isAdmin ? 300.ms : 200.ms)
+                .slideY(begin: 0.1, end: 0),
 
             SizedBox(height: 16.h),
 
             // About Section
             _buildEnhancedSection(
-              context: context,
-              isDark: isDark,
-              title: 'ABOUT',
-              icon: Icons.info_rounded,
-              children: [
-                _buildPremiumTile(
                   context: context,
                   isDark: isDark,
-                  title: AppConstants.appName,
-                  subtitle: 'Version 1.0.0',
-                  icon: Icons.apps_rounded,
-                  trailing: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Text(
-                      'v1.0.0',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w600,
+                  title: 'ABOUT',
+                  icon: Icons.info_rounded,
+                  children: [
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: AppConstants.appName,
+                      subtitle: 'Version 1.0.0',
+                      icon: Icons.apps_rounded,
+                      trailing: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(
+                          'v1.0.1',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
+                      onTap: null,
                     ),
-                  ),
-                  onTap: null,
-                ),
-                _buildPremiumTile(
-                  context: context,
-                  isDark: isDark,
-                  title: 'Check for Updates',
-                  subtitle: 'Download the latest version',
-                  icon: Icons.system_update_rounded,
-                  iconColor: AppColors.primaryTeal,
-                  trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp),
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    AppUpdateService.checkForUpdatesManual(context);
-                  },
-                ),
-                _buildPremiumTile(
-                  context: context,
-                  isDark: isDark,
-                  title: 'Developer',
-                  subtitle: AppConstants.developerName,
-                  icon: Icons.code_rounded,
-                  trailing: Icon(Icons.chevron_right_rounded, size: 16.sp),
-                  onTap: null,
-                ),
-              ],
-            ).animate().fadeIn(duration: 300.ms, delay: isAdmin ? 400.ms : 300.ms).slideY(begin: 0.1, end: 0),
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: 'Check for Updates',
+                      subtitle: 'Download the latest version',
+                      icon: Icons.system_update_rounded,
+                      iconColor: AppColors.primaryTeal,
+                      trailing: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16.sp,
+                      ),
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        AppUpdateService.checkForUpdatesManual(context);
+                      },
+                    ),
+                    _buildPremiumTile(
+                      context: context,
+                      isDark: isDark,
+                      title: 'Developer',
+                      subtitle: AppConstants.developerName,
+                      icon: Icons.code_rounded,
+                      trailing: Icon(Icons.chevron_right_rounded, size: 16.sp),
+                      onTap: null,
+                    ),
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: isAdmin ? 400.ms : 300.ms)
+                .slideY(begin: 0.1, end: 0),
 
             SizedBox(height: 32.h),
 
@@ -305,7 +361,9 @@ class SettingsScreen extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : Colors.grey[300]!).withValues(alpha: 0.3),
+            color: (isDark ? Colors.black : Colors.grey[300]!).withValues(
+              alpha: 0.3,
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -340,7 +398,10 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[200]),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.grey[800] : Colors.grey[200],
+          ),
           // Children
           ...children,
         ],
@@ -370,7 +431,9 @@ class SettingsScreen extends ConsumerWidget {
               Container(
                 padding: EdgeInsets.all(10.w),
                 decoration: BoxDecoration(
-                  color: (iconColor ?? AppColors.primaryTeal).withValues(alpha: 0.1),
+                  color: (iconColor ?? AppColors.primaryTeal).withValues(
+                    alpha: 0.1,
+                  ),
                   borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: Icon(
@@ -394,18 +457,12 @@ class SettingsScreen extends ConsumerWidget {
                     SizedBox(height: 4.h),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontSize: 12.sp, color: Colors.grey),
                     ),
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                SizedBox(width: 12.w),
-                trailing,
-              ],
+              if (trailing != null) ...[SizedBox(width: 12.w), trailing],
             ],
           ),
         ),
@@ -432,11 +489,7 @@ class SettingsScreen extends ConsumerWidget {
               color: AppColors.primaryTeal.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12.r),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primaryTeal,
-              size: 22.sp,
-            ),
+            child: Icon(icon, color: AppColors.primaryTeal, size: 22.sp),
           ),
           SizedBox(width: 16.w),
           Expanded(
@@ -453,10 +506,7 @@ class SettingsScreen extends ConsumerWidget {
                 SizedBox(height: 4.h),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 12.sp, color: Colors.grey),
                 ),
               ],
             ),
@@ -484,7 +534,9 @@ class SettingsScreen extends ConsumerWidget {
       builder: (dialogContext) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28.r),
+          ),
           child: Container(
             padding: EdgeInsets.all(32.w),
             decoration: BoxDecoration(
@@ -493,7 +545,10 @@ class SettingsScreen extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: isDark
-                    ? [Theme.of(context).dialogBackgroundColor, Theme.of(context).dialogBackgroundColor]
+                    ? [
+                        Theme.of(context).dialogBackgroundColor,
+                        Theme.of(context).dialogBackgroundColor,
+                      ]
                     : [Colors.white, Colors.grey[50]!],
               ),
             ),
@@ -509,14 +564,21 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.logout_rounded, color: Colors.white, size: 48.sp),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: Colors.white,
+                    size: 48.sp,
+                  ),
                 ),
                 SizedBox(height: 24.h),
 
                 // Title
                 Text(
                   'Sign Out',
-                  style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 SizedBox(height: 12.h),
 
@@ -524,7 +586,11 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   'Are you sure you want to sign out?\n\nYou will need to sign in again to access your library.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600], height: 1.5),
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
                 ),
                 SizedBox(height: 32.h),
 
@@ -536,10 +602,18 @@ class SettingsScreen extends ConsumerWidget {
                         onPressed: () => Navigator.pop(dialogContext, false),
                         style: OutlinedButton.styleFrom(
                           padding: EdgeInsets.symmetric(vertical: 14.h),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16.r),
+                          ),
                           side: BorderSide(color: Colors.grey[300]!),
                         ),
-                        child: Text('Cancel', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600)),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                     SizedBox(width: 12.w),
@@ -550,9 +624,17 @@ class SettingsScreen extends ConsumerWidget {
                           backgroundColor: Colors.red,
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(vertical: 14.h),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16.r),
+                          ),
                         ),
-                        child: Text('Sign Out', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600)),
+                        child: Text(
+                          'Sign Out',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -571,7 +653,10 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _showChangePasswordDialog(BuildContext context, WidgetRef ref) async {
+  Future<void> _showChangePasswordDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     HapticFeedback.mediumImpact();
     final currentController = TextEditingController();
     final newController = TextEditingController();
@@ -580,7 +665,9 @@ class SettingsScreen extends ConsumerWidget {
     await showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
         child: SingleChildScrollView(
           child: Container(
             padding: EdgeInsets.all(28.w),
@@ -623,7 +710,9 @@ class SettingsScreen extends ConsumerWidget {
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: 'Current Password *',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
                   ),
                 ),
@@ -633,7 +722,9 @@ class SettingsScreen extends ConsumerWidget {
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: 'New Password *',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                     prefixIcon: const Icon(Icons.lock_reset_rounded),
                   ),
                 ),
@@ -643,7 +734,9 @@ class SettingsScreen extends ConsumerWidget {
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: 'Confirm New Password *',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                     prefixIcon: const Icon(Icons.check_circle_outline_rounded),
                   ),
                 ),
@@ -680,15 +773,16 @@ class SettingsScreen extends ConsumerWidget {
                           await showPremiumErrorDialog(
                             dialogContext,
                             title: 'Validation Error',
-                            message: 'Password must be at least 4 characters long.',
+                            message:
+                                'Password must be at least 4 characters long.',
                             icon: Icons.warning_rounded,
                           );
                           return;
                         }
 
-                        final verified = await ref.read(adminModeProvider.notifier).verifyAdminPassword(
-                          currentController.text,
-                        );
+                        final verified = await ref
+                            .read(adminModeProvider.notifier)
+                            .verifyAdminPassword(currentController.text);
 
                         if (!verified) {
                           if (!context.mounted) return;
@@ -701,9 +795,9 @@ class SettingsScreen extends ConsumerWidget {
                           return;
                         }
 
-                        await ref.read(adminModeProvider.notifier).updateAdminPassword(
-                          newController.text,
-                        );
+                        await ref
+                            .read(adminModeProvider.notifier)
+                            .updateAdminPassword(newController.text);
 
                         if (!context.mounted) return;
                         Navigator.pop(dialogContext);
@@ -711,14 +805,18 @@ class SettingsScreen extends ConsumerWidget {
                         await showPremiumSuccessDialog(
                           context,
                           title: 'Password Updated!',
-                          message: 'Your admin password has been changed successfully.',
+                          message:
+                              'Your admin password has been changed successfully.',
                           icon: Icons.check_circle_rounded,
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryTeal,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 14.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 28.w,
+                          vertical: 14.h,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12.r),
                         ),
