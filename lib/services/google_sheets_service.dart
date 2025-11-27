@@ -303,7 +303,7 @@ class GoogleSheetsService {
     throw Exception('Request failed after maximum retries');
   }
 
-  /// Get all books from the inventory
+  /// Get all books from the inventory with pagination support
   Future<List<Book>> getAllBooks({bool forceRefresh = false}) async {
     const cacheKey = 'all_books';
 
@@ -315,26 +315,59 @@ class GoogleSheetsService {
       () async {
         _ensureInitialized();
 
-        final response = await _sheetsApi!.spreadsheets.values.get(
-          AppConstants.spreadsheetId,
-          '${AppConstants.bookInventorySheet}!A2:G',
-        );
+        final List<Book> allBooks = [];
+        int pageSize = 500; // Fetch 500 rows at a time to avoid API limits
+        int startRow = 2; // Start after header row
 
-        if (response.values == null || response.values!.isEmpty) {
-          return [];
+        while (true) {
+          final endRow = startRow + pageSize - 1;
+          final range = '${AppConstants.bookInventorySheet}!A$startRow:G$endRow';
+
+          _logger.d('Fetching books from row $startRow to $endRow');
+
+          try {
+            final response = await _sheetsApi!.spreadsheets.values.get(
+              AppConstants.spreadsheetId,
+              range,
+            );
+
+            if (response.values == null || response.values!.isEmpty) {
+              // No more books to fetch
+              _logger.i('Finished fetching all books. Total: ${allBooks.length}');
+              break;
+            }
+
+            final booksInThisBatch = response.values!
+                .map((row) {
+                  try {
+                    return Book.fromSheetsRow(row);
+                  } catch (e) {
+                    _logger.w('Failed to parse book row: $e');
+                    return null;
+                  }
+                })
+                .whereType<Book>()
+                .toList();
+
+            allBooks.addAll(booksInThisBatch);
+            _logger.d('Fetched ${booksInThisBatch.length} books in this batch. Total so far: ${allBooks.length}');
+
+            // If we got fewer rows from Sheets API than requested, we've reached the end
+            // Note: Check response.values.length, not booksInThisBatch.length,
+            // because some rows might fail to parse but there could still be more data
+            if (response.values!.length < pageSize) {
+              _logger.i('Reached end of data. Total books: ${allBooks.length}');
+              break;
+            }
+
+            startRow = endRow + 1;
+          } catch (e) {
+            _logger.e('Error fetching books batch: $e');
+            rethrow;
+          }
         }
 
-        return response.values!
-            .map((row) {
-              try {
-                return Book.fromSheetsRow(row);
-              } catch (e) {
-                _logger.w('Failed to parse book row: $e');
-                return null;
-              }
-            })
-            .whereType<Book>()
-            .toList();
+        return allBooks;
       },
       cacheKey: cacheKey,
       cacheDuration: AppConstants.cacheExpiration,

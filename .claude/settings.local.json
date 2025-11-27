@@ -32,7 +32,10 @@
       "Bash(flutter analyze:*)",
       "Bash(git check-ignore:*)",
       "Bash(gh release list:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gradlew:*)",
+      "Bash(taskkill:*)",
+      "Bash(if exist \"android\\.gradle\" rd /s /q \"android\\.gradle\")"
     ],
     "deny": [],
     "ask": []
