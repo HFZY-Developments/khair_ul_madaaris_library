@@ -610,8 +610,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       constraints: BoxConstraints(maxWidth: screenWidth * 0.85),
                       child: Text(
                         isAdmin
-                            ? 'Add Book • Checkout • Return'
-                            : 'Checkout • Return • View Info',
+                            ? 'Add Book / Checkout / Return'
+                            : 'Checkout / Return / View Info',
                         style: TextStyle(
                           fontSize: subtitleSize,
                           fontWeight: FontWeight.w600,
@@ -774,7 +774,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             SizedBox(width: (12.0 * scale).clamp(10.0, 18.0)),
             Expanded(
               child: Text(
-                'Connected to Google Sheets ✓',
+                'Connected to Google Sheets',
                 style: TextStyle(
                   fontSize: (14.0 * scale).clamp(12.0, 22.0),
                   color: AppColors.successLight,
@@ -865,7 +865,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     await showPremiumErrorDialog(
                       context,
                       title: 'Sign-In Failed',
-                      message: 'Could not connect to Google.\n\nPlease check:\n• Internet connection\n• Google account permissions\n• OAuth configuration',
+                      message: 'Could not connect to Google.\n\nPlease check:\n- Internet connection\n- Google account permissions\n- OAuth configuration',
                       icon: Icons.error_rounded,
                     );
                   }
@@ -886,7 +886,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     title: isOfflineError ? 'No Internet Connection' : 'Sign-In Error',
                     message: isOfflineError
                         ? 'Unable to connect to Google.\n\nPlease check your internet connection and try again.'
-                        : 'An error occurred during sign-in:\n\n${e.toString()}\n\nPlease check:\n• Internet connection\n• Google account permissions',
+                        : 'An error occurred during sign-in:\n\n${e.toString()}\n\nPlease check:\n- Internet connection\n- Google account permissions',
                     icon: isOfflineError ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
                   );
                 }

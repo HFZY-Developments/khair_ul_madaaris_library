@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/responsive.dart';
@@ -267,31 +268,42 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'ABOUT',
                   icon: Icons.info_rounded,
                   children: [
-                    _buildPremiumTile(
-                      context: context,
-                      isDark: isDark,
-                      title: AppConstants.appName,
-                      subtitle: 'Version 1.0.3',
-                      icon: Icons.apps_rounded,
-                      trailing: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10.w,
-                          vertical: 4.h,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        child: Text(
-                          'v1.0.3',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w600,
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        final info = snapshot.data;
+                        final versionLabel = info == null
+                            ? 'Version'
+                            : 'Version ${info.version} (${info.buildNumber})';
+                        final badgeText = info == null ? 'v--' : 'v${info.version}';
+
+                        return _buildPremiumTile(
+                          context: context,
+                          isDark: isDark,
+                          title: AppConstants.appName,
+                          subtitle: versionLabel,
+                          icon: Icons.apps_rounded,
+                          trailing: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      onTap: null,
+                          onTap: null,
+                        );
+                      },
                     ),
                     _buildPremiumTile(
                       context: context,

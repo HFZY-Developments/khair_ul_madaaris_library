@@ -19,10 +19,21 @@ class AdminDashboardScreen extends ConsumerStatefulWidget {
 
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
+  List<Book> _booksWithTitles = const [];
+  List<_SearchEntry> _searchIndex = const [];
+  List<_SearchEntry> _lastSearchPool = const [];
+  List<Book> _searchResults = const [];
+  List<Book>? _lastBooksRef;
+  String _lastSearchQuery = '';
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -95,41 +106,419 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 
   Widget _buildDashboard(BuildContext context, LibraryStats stats, List<Book> books) {
-    // Filter books with titles only
-    final booksWithTitles = books.where((book) => book.title.trim().isNotEmpty).toList();
+    _prepareSearchIndex(books);
+
+    final booksWithTitles = _booksWithTitles;
+    final trimmedQuery = _searchQuery.trim();
+    final hasQuery = trimmedQuery.isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Calculate overdue books manually (14-day detection)
     final overdueBooks = booksWithTitles.where((book) => book.isOverdue).toList();
     final checkedOutBooks = booksWithTitles.where((book) => book.status == BookStatus.checkedOut).toList();
 
-    return SingleChildScrollView(
+    final headerChildren = <Widget>[
+      _buildSearchBar(),
+      SizedBox(height: 16.h),
+      if (hasQuery) ...[
+        _buildSearchSummary(trimmedQuery, _searchResults.length),
+        SizedBox(height: 12.h),
+      ],
+    ];
+
+    return CustomScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.all(20.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Premium Stats Bar - Clickable
-          _buildPremiumStatsBar(stats, booksWithTitles, checkedOutBooks, overdueBooks),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate(headerChildren),
+          ),
+        ),
+        if (hasQuery)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+            sliver: _buildSearchResultsSliver(_searchResults, isDark),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Premium Stats Bar - Clickable
+                  _buildPremiumStatsBar(stats, booksWithTitles, checkedOutBooks, overdueBooks),
 
-          SizedBox(height: 28.h),
+                  SizedBox(height: 28.h),
 
-          // Overdue Alert (if any)
-          if (overdueBooks.isNotEmpty) ...[
-            _buildOverdueAlert(overdueBooks),
-            SizedBox(height: 28.h),
+                  // Overdue Alert (if any)
+                  if (overdueBooks.isNotEmpty) ...[
+                    _buildOverdueAlert(overdueBooks),
+                    SizedBox(height: 28.h),
+                  ],
+
+                  // Interactive Shelves Section
+                  _buildShelvesSection(stats, booksWithTitles),
+
+                  SizedBox(height: 28.h),
+
+                  // Categories Section
+                  _buildCategoriesSection(stats, booksWithTitles),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark
+        ? AppColors.primaryTeal.withValues(alpha: 0.35)
+        : AppColors.primaryTeal.withValues(alpha: 0.2);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryTeal.withValues(alpha: 0.25),
+            AppColors.primaryLime.withValues(alpha: 0.25),
           ],
+        ),
+        borderRadius: BorderRadius.circular(22.r),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryTeal.withValues(alpha: isDark ? 0.2 : 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(1.4.w),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 2.h),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          onChanged: _handleSearchChanged,
+          onSubmitted: _applySearch,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Search title, ID, shelf, category, borrower',
+            hintStyle: TextStyle(
+              fontSize: 13.sp,
+              color: isDark ? Colors.grey[500] : Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: AppColors.primaryTeal,
+              size: 22.sp,
+            ),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    icon: Icon(Icons.clear_rounded, color: Colors.grey[500]),
+                    onPressed: () {
+                      _searchController.clear();
+                      _applySearch('');
+                      FocusScope.of(context).unfocus();
+                    },
+                  ),
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+          ),
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
+        ),
+      ),
+    );
+  }
 
-          // Interactive Shelves Section
-          _buildShelvesSection(stats, booksWithTitles),
+  Widget _buildSearchSummary(String query, int resultCount) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-          SizedBox(height: 28.h),
-
-          // Categories Section
-          _buildCategoriesSection(stats, booksWithTitles),
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.white,
+        borderRadius: BorderRadius.circular(18.r),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.search_rounded, color: AppColors.primaryTeal, size: 20.sp),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'Search Results',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : AppColors.primaryDarkBlue,
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(
+                    color: AppColors.primaryTeal.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '$resultCount',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryTeal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'Results for: "$query"',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildSearchResultsSliver(List<Book> results, bool isDark) {
+    if (results.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _buildSearchEmptyState(isDark),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => Padding(
+          padding: EdgeInsets.only(top: 10.h),
+          child: _buildSearchResultItem(results[index], isDark),
+        ),
+        childCount: results.length,
+      ),
+    );
+  }
+
+  Widget _buildSearchEmptyState(bool isDark) {
+    return Padding(
+      padding: EdgeInsets.only(top: 4.h),
+      child: Text(
+        'No matching books found. Try a shorter search.',
+        style: TextStyle(
+          fontSize: 14.sp,
+          color: isDark ? Colors.grey[300] : Colors.grey[600],
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultItem(Book book, bool isDark) {
+    final statusColor = book.statusColor;
+    final subtitleText = '${book.bookId} - ${book.shelf} / ${book.category}';
+    final borrowerName = book.borrowerName?.trim();
+    final hasBorrower = borrowerName != null && borrowerName.isNotEmpty;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14.r),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showBooksBottomSheet(
+          title: 'Search Result',
+          books: [book],
+          icon: Icons.search_rounded,
+          color: AppColors.primaryTeal,
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: statusColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(book.statusIcon, color: Colors.white, size: 18.sp),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppColors.primaryDarkBlue,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    subtitleText,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: isDark ? Colors.grey[300] : Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (hasBorrower) ...[
+                    SizedBox(height: 4.h),
+                    Text(
+                      'Borrower: $borrowerName',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: isDark ? Colors.grey[300] : Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                book.statusText,
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _prepareSearchIndex(List<Book> books) {
+    if (identical(_lastBooksRef, books)) {
+      return;
+    }
+
+    _lastBooksRef = books;
+    _booksWithTitles = books.where((book) => book.title.trim().isNotEmpty).toList();
+    _searchIndex = _booksWithTitles
+        .map((book) => _SearchEntry(book, _buildSearchText(book)))
+        .toList();
+    _lastSearchPool = _searchIndex;
+    _lastSearchQuery = '';
+
+    if (_searchQuery.trim().isNotEmpty) {
+      _searchResults = _filterSearchIndex(_searchQuery.trim());
+    } else {
+      _searchResults = const [];
+    }
+  }
+
+  String _buildSearchText(Book book) {
+    return [
+      book.bookId,
+      book.title,
+      book.author,
+      book.category,
+      book.shelf,
+      book.borrowerName ?? '',
+      book.statusText,
+      book.status.name,
+    ].join(' ').toLowerCase();
+  }
+
+  List<Book> _filterSearchIndex(String query) {
+    if (query.isEmpty) {
+      _lastSearchQuery = '';
+      _lastSearchPool = _searchIndex;
+      return const [];
+    }
+
+    final normalized = query.toLowerCase();
+    final terms = normalized.split(RegExp(r'\s+')).where((term) => term.isNotEmpty).toList();
+    final source = _lastSearchQuery.isNotEmpty && normalized.startsWith(_lastSearchQuery)
+        ? _lastSearchPool
+        : _searchIndex;
+
+    final matches = <_SearchEntry>[];
+    for (final entry in source) {
+      var matchesAll = true;
+      for (final term in terms) {
+        if (!entry.searchText.contains(term)) {
+          matchesAll = false;
+          break;
+        }
+      }
+      if (matchesAll) {
+        matches.add(entry);
+      }
+    }
+
+    _lastSearchQuery = normalized;
+    _lastSearchPool = matches;
+    return matches.map((entry) => entry.book).toList();
+  }
+
+  void _handleSearchChanged(String value) {
+    final trimmed = value.trim();
+    final results = trimmed.isEmpty ? const <Book>[] : _filterSearchIndex(trimmed);
+
+    setState(() {
+      _searchQuery = value;
+      _searchResults = results;
+    });
+  }
+
+  void _applySearch(String value) {
+    _handleSearchChanged(value);
   }
 
   /// Premium Stats Bar - Beautiful gradient cards that are tappable
@@ -1147,7 +1536,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                 ),
                                 SizedBox(height: 4.h),
                                 Text(
-                                  '${book.shelf} • ${book.category}',
+                                  '${book.shelf} / ${book.category}',
                                   style: TextStyle(fontSize: 13.sp, color: Colors.grey[600]),
                                 ),
                                 if (book.borrowerName != null) ...[
@@ -1246,4 +1635,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       ],
     );
   }
+}
+
+class _SearchEntry {
+  final Book book;
+  final String searchText;
+
+  _SearchEntry(this.book, this.searchText);
 }
