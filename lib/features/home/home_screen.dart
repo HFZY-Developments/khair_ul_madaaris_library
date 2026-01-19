@@ -15,6 +15,7 @@ import '../../providers/app_state_provider.dart';
 import '../../services/google_sheets_service.dart';
 import '../scanner/qr_scanner_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
+import 'kitaab_search_screen.dart';
 import '../settings/settings_screen.dart';
 import '../donation/donation_screen.dart';
 import '../../services/app_update_service.dart';
@@ -79,6 +80,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(adminModeProvider);
     final connectionStatus = ref.watch(sheetsConnectionProvider);
+    final isConnected = connectionStatus.maybeWhen(
+      data: (connected) => connected,
+      orElse: () => false,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -358,6 +363,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               fontSize: 18.sp,
                               fontWeight: FontWeight.w700,
                               color: AppColors.primaryLime,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2, end: 0),
+                    SizedBox(height: verticalSpacing),
+                  ] else ...[
+                    DebouncedOutlinedButton(
+                      onPressed: () async {
+                        if (!isConnected) {
+                          await showPremiumErrorDialog(
+                            context,
+                            title: 'Sign In Required',
+                            message: 'Please sign in with Google to search the library.',
+                            icon: Icons.lock_rounded,
+                          );
+                          return;
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const KitaabSearchScreen()),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.primaryTeal, width: 2),
+                        padding: EdgeInsets.symmetric(vertical: 20.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_rounded, color: AppColors.primaryTeal, size: 24.sp),
+                          SizedBox(width: 12.w),
+                          Text(
+                            'Kitaab Search',
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryTeal,
                             ),
                           ),
                         ],
@@ -977,4 +1024,5 @@ class _AdminPasswordDialogState extends State<_AdminPasswordDialog> {
     );
   }
 }
+
 
