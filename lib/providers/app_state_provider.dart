@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 import '../models/app_user.dart';
@@ -8,12 +9,15 @@ import '../models/library_stats.dart';
 import '../services/google_sheets_service.dart';
 
 /// Theme Mode Provider
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((
+  ref,
+) {
   return ThemeModeNotifier();
 });
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  ThemeModeNotifier() : super(ThemeMode.dark) { // Default to dark mode
+  ThemeModeNotifier() : super(ThemeMode.dark) {
+    // Default to dark mode
     _loadThemeMode();
   }
 
@@ -40,14 +44,17 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
   void toggleTheme(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    setThemeMode(brightness == Brightness.light ? ThemeMode.dark : ThemeMode.light);
+    setThemeMode(
+      brightness == Brightness.light ? ThemeMode.dark : ThemeMode.light,
+    );
   }
 }
 
 /// Current User Provider
-final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, AppUser?>((ref) {
-  return CurrentUserNotifier();
-});
+final currentUserProvider =
+    StateNotifierProvider<CurrentUserNotifier, AppUser?>((ref) {
+      return CurrentUserNotifier();
+    });
 
 class CurrentUserNotifier extends StateNotifier<AppUser?> {
   CurrentUserNotifier() : super(null) {
@@ -102,7 +109,8 @@ class AdminModeNotifier extends StateNotifier<bool> {
 
   Future<bool> verifyAdminPassword(String password) async {
     final prefs = await SharedPreferences.getInstance();
-    final savedPassword = prefs.getString(AppConstants.adminPasswordKey) ??
+    final savedPassword =
+        prefs.getString(AppConstants.adminPasswordKey) ??
         AppConstants.defaultAdminPassword;
     return password == savedPassword;
   }
@@ -139,18 +147,27 @@ final libraryStatsProvider = FutureProvider<LibraryStats>((ref) async {
   }
 
   final totalBooks = books.length;
-  final availableBooks = books.where((b) => b.status == BookStatus.available).length;
-  final checkedOutBooks = books.where((b) => b.status == BookStatus.checkedOut).length;
+  final availableBooks = books
+      .where((b) => b.status == BookStatus.available)
+      .length;
+  final checkedOutBooks = books
+      .where((b) => b.status == BookStatus.checkedOut)
+      .length;
   final overdueBooks = books.where((b) => b.isOverdue).length;
-  final reservedBooks = books.where((b) => b.status == BookStatus.reserved).length;
-  final damagedBooks = books.where((b) => b.status == BookStatus.damaged).length;
+  final reservedBooks = books
+      .where((b) => b.status == BookStatus.reserved)
+      .length;
+  final damagedBooks = books
+      .where((b) => b.status == BookStatus.damaged)
+      .length;
   final lostBooks = books.where((b) => b.status == BookStatus.lost).length;
 
   // Books by category (filter out empty categories)
   final booksByCategory = <String, int>{};
   for (final book in books) {
     if (book.category.trim().isNotEmpty) {
-      booksByCategory[book.category] = (booksByCategory[book.category] ?? 0) + 1;
+      booksByCategory[book.category] =
+          (booksByCategory[book.category] ?? 0) + 1;
     }
   }
 
@@ -164,15 +181,18 @@ final libraryStatsProvider = FutureProvider<LibraryStats>((ref) async {
 
   // Top borrowers
   final borrowerCounts = <String, int>{};
-  for (final book in books.where((b) => b.borrowerName != null && b.borrowerName!.trim().isNotEmpty)) {
+  for (final book in books.where(
+    (b) => b.borrowerName != null && b.borrowerName!.trim().isNotEmpty,
+  )) {
     final name = book.borrowerName!;
     borrowerCounts[name] = (borrowerCounts[name] ?? 0) + 1;
   }
 
-  final topBorrowers = borrowerCounts.entries
-      .map((e) => TopBorrower(name: e.key, booksCheckedOut: e.value))
-      .toList()
-    ..sort((a, b) => b.booksCheckedOut.compareTo(a.booksCheckedOut));
+  final topBorrowers =
+      borrowerCounts.entries
+          .map((e) => TopBorrower(name: e.key, booksCheckedOut: e.value))
+          .toList()
+        ..sort((a, b) => b.booksCheckedOut.compareTo(a.booksCheckedOut));
 
   return LibraryStats(
     totalBooks: totalBooks,
@@ -191,8 +211,12 @@ final libraryStatsProvider = FutureProvider<LibraryStats>((ref) async {
 });
 
 /// Refresh Books Provider (for pull-to-refresh, filters out invalid books)
-final refreshBooksProvider = FutureProvider.autoDispose<List<Book>>((ref) async {
-  final allBooks = await GoogleSheetsService.instance.getAllBooks(forceRefresh: true);
+final refreshBooksProvider = FutureProvider.autoDispose<List<Book>>((
+  ref,
+) async {
+  final allBooks = await GoogleSheetsService.instance.getAllBooks(
+    forceRefresh: true,
+  );
   // Filter out books that don't have title, shelf, AND category
   return allBooks.where((book) {
     return book.title.trim().isNotEmpty &&

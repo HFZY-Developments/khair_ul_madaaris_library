@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/sheets/v4.dart' as sheets;
-import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +24,6 @@ class GoogleSheetsService {
   final Logger _logger = Logger();
   GoogleSignIn? _googleSignIn;
   sheets.SheetsApi? _sheetsApi;
-  auth.AutoRefreshingAuthClient? _authClient;
   bool _isSignedIn = false;
 
   // Rate Limiting
@@ -63,28 +61,32 @@ class GoogleSheetsService {
     try {
       _logger.i('Initializing Google Sheets Service');
 
-      _googleSignIn = GoogleSignIn(
-        scopes: [sheets.SheetsApi.spreadsheetsScope],
+      _googleSignIn = GoogleSignIn.instance;
+      await _googleSignIn!.initialize(
         serverClientId: AppConstants.serverClientId,
       );
 
       // OPTIMIZATION: Check if user has ever signed in before
       final prefs = await SharedPreferences.getInstance();
-      final hasSignedInBefore = prefs.getString(AppConstants.keyUserEmail) != null;
+      final hasSignedInBefore =
+          prefs.getString(AppConstants.keyUserEmail) != null;
 
       // CRITICAL: Set initial connection status based on saved data (prevents scanner lock on relaunch)
       _lastConnectionStatus = hasSignedInBefore;
 
       if (!hasSignedInBefore) {
         // Skip silent sign-in check if never signed in before (saves time on first launch)
-        _logger.i('No previous sign-in detected, skipping silent sign-in check');
+        _logger.i(
+          'No previous sign-in detected, skipping silent sign-in check',
+        );
         _isSignedIn = false;
         _updateConnectionStatus(false);
       } else {
         // Try silent sign-in with timeout (restore previous session)
         _logger.i('Previous sign-in detected, attempting silent sign-in');
         try {
-          final account = await _googleSignIn!.signInSilently(suppressErrors: true);
+          final attempt = _googleSignIn!.attemptLightweightAuthentication();
+          final account = attempt == null ? null : await attempt;
           if (account != null) {
             await _setupAuthClient(account);
             _isSignedIn = true;
@@ -107,7 +109,11 @@ class GoogleSheetsService {
 
       _logger.i('Google Sheets Service initialized. Signed in: $_isSignedIn');
     } catch (e, stackTrace) {
-      _logger.e('Failed to initialize Google Sheets Service', error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Failed to initialize Google Sheets Service',
+        error: e,
+        stackTrace: stackTrace,
+      );
       _isSignedIn = false;
       _updateConnectionStatus(false);
       rethrow;
@@ -132,7 +138,13 @@ class GoogleSheetsService {
         throw Exception('GoogleSignIn not initialized');
       }
 
-      final account = await _googleSignIn!.signIn();
+      GoogleSignInAccount? account;
+      if (_googleSignIn!.supportsAuthenticate()) {
+        account = await _googleSignIn!.authenticate();
+      } else {
+        final attempt = _googleSignIn!.attemptLightweightAuthentication();
+        account = attempt == null ? null : await attempt;
+      }
       if (account == null) {
         _logger.w('User canceled sign-in');
         return false;
@@ -145,7 +157,10 @@ class GoogleSheetsService {
       // Save sign-in info
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.keyUserEmail, account.email);
-      await prefs.setString(AppConstants.keyLastSyncTime, DateTime.now().toIso8601String());
+      await prefs.setString(
+        AppConstants.keyLastSyncTime,
+        DateTime.now().toIso8601String(),
+      );
 
       _logger.i('Successfully signed in as ${account.email}');
       return true;
@@ -163,8 +178,6 @@ class GoogleSheetsService {
   Future<void> signOut() async {
     try {
       await _googleSignIn?.signOut();
-      _authClient?.close();
-      _authClient = null;
       _sheetsApi = null;
       _isSignedIn = false;
       _updateConnectionStatus(false);
@@ -181,12 +194,15 @@ class GoogleSheetsService {
 
   /// Setup auth client
   Future<void> _setupAuthClient(GoogleSignInAccount account) async {
-    final auth = await account.authentication;
-    final credentials = auth.accessToken;
-
-    if (credentials == null) {
-      throw Exception('Failed to get access token');
-    }
+    final auth = await account.authorizationClient.authorizationForScopes([
+      sheets.SheetsApi.spreadsheetsScope,
+    ]);
+    final grantedAuth =
+        auth ??
+        await account.authorizationClient.authorizeScopes([
+          sheets.SheetsApi.spreadsheetsScope,
+        ]);
+    final credentials = grantedAuth.accessToken;
 
     final authHeaders = {'Authorization': 'Bearer $credentials'};
     final authenticatedClient = _GoogleAuthClient(authHeaders);
@@ -237,7 +253,8 @@ class GoogleSheetsService {
     // Check if we've exceeded the rate limit
     if (_requestTimestamps.length >= AppConstants.maxRequestsPerMinute) {
       final oldestRequest = _requestTimestamps.first;
-      final waitTime = const Duration(minutes: 1) - now.difference(oldestRequest);
+      final waitTime =
+          const Duration(minutes: 1) - now.difference(oldestRequest);
 
       _logger.w('Rate limit reached. Waiting ${waitTime.inSeconds} seconds');
       await Future.delayed(waitTime);
@@ -294,7 +311,9 @@ class GoogleSheetsService {
           rethrow;
         }
 
-        _logger.w('Request failed (attempt $attemptNum/${AppConstants.maxRetryAttempts}), retrying in ${delay.inSeconds}s');
+        _logger.w(
+          'Request failed (attempt $attemptNum/${AppConstants.maxRetryAttempts}), retrying in ${delay.inSeconds}s',
+        );
         await Future.delayed(delay);
         delay *= 2; // Exponential backoff
       }
@@ -316,12 +335,14 @@ class GoogleSheetsService {
         _ensureInitialized();
 
         final List<Book> allBooks = [];
-        int pageSize = 500; // Fetch 500 rows at a time to avoid API limits
+        const int pageSize =
+            500; // Fetch 500 rows at a time to avoid API limits
         int startRow = 2; // Start after header row
 
         while (true) {
           final endRow = startRow + pageSize - 1;
-          final range = '${AppConstants.bookInventorySheet}!A$startRow:G$endRow';
+          final range =
+              '${AppConstants.bookInventorySheet}!A$startRow:G$endRow';
 
           _logger.d('Fetching books from row $startRow to $endRow');
 
@@ -333,7 +354,9 @@ class GoogleSheetsService {
 
             if (response.values == null || response.values!.isEmpty) {
               // No more books to fetch
-              _logger.i('Finished fetching all books. Total: ${allBooks.length}');
+              _logger.i(
+                'Finished fetching all books. Total: ${allBooks.length}',
+              );
               break;
             }
 
@@ -350,7 +373,9 @@ class GoogleSheetsService {
                 .toList();
 
             allBooks.addAll(booksInThisBatch);
-            _logger.d('Fetched ${booksInThisBatch.length} books in this batch. Total so far: ${allBooks.length}');
+            _logger.d(
+              'Fetched ${booksInThisBatch.length} books in this batch. Total so far: ${allBooks.length}',
+            );
 
             // If we got fewer rows from Sheets API than requested, we've reached the end
             // Note: Check response.values.length, not booksInThisBatch.length,
@@ -387,7 +412,9 @@ class GoogleSheetsService {
       () async {
         final books = await getAllBooks(forceRefresh: forceRefresh);
         final book = books.where((book) => book.bookId == bookId).firstOrNull;
-        _logger.i('getBookById result for $bookId: ${book != null ? "FOUND (checkout date: ${book.checkoutDate})" : "NOT FOUND"}');
+        _logger.i(
+          'getBookById result for $bookId: ${book != null ? "FOUND (checkout date: ${book.checkoutDate})" : "NOT FOUND"}',
+        );
         return book;
       },
       cacheKey: cacheKey,
@@ -397,74 +424,130 @@ class GoogleSheetsService {
 
   /// Add new book
   Future<bool> addBook(Book book) async {
-    return _executeWithRetry(
-      () async {
-        _ensureInitialized();
+    return _executeWithRetry(() async {
+      _ensureInitialized();
 
-        // Check for duplicates
-        final existing = await getBookById(book.bookId);
-        if (existing != null) {
-          throw Exception('Book with ID ${book.bookId} already exists');
-        }
+      // Check for duplicates
+      final existing = await getBookById(book.bookId);
+      if (existing != null) {
+        throw Exception('Book with ID ${book.bookId} already exists');
+      }
 
-        final valueRange = sheets.ValueRange.fromJson({
-          'values': [book.toSheetsRow()],
-        });
+      final valueRange = sheets.ValueRange.fromJson({
+        'values': [book.toSheetsRow()],
+      });
 
-        await _sheetsApi!.spreadsheets.values.append(
-          valueRange,
-          AppConstants.spreadsheetId,
-          '${AppConstants.bookInventorySheet}!A:G',
-          valueInputOption: 'USER_ENTERED',
-        );
+      await _sheetsApi!.spreadsheets.values.append(
+        valueRange,
+        AppConstants.spreadsheetId,
+        '${AppConstants.bookInventorySheet}!A:G',
+        valueInputOption: 'USER_ENTERED',
+      );
 
-        _clearCache();
-        _logger.i('Book added: ${book.bookId}');
-        return true;
-      },
-    );
+      _clearCache();
+      _logger.i('Book added: ${book.bookId}');
+      return true;
+    });
   }
 
   /// Update book (checkout/return)
   Future<bool> updateBook(Book book) async {
-    return _executeWithRetry(
-      () async {
-        _ensureInitialized();
+    return _executeWithRetry(() async {
+      _ensureInitialized();
 
-        // Find the row index
-        final books = await getAllBooks(forceRefresh: true);
-        final index = books.indexWhere((b) => b.bookId == book.bookId);
+      // Find exact row number directly from raw sheet rows to avoid
+      // index drift when there are malformed rows above the target row.
+      final rowNumber = await _findBookRowNumber(book.bookId);
+      final sheetsRow = book.toSheetsRow();
 
-        if (index == -1) {
-          throw Exception('Book not found: ${book.bookId}');
-        }
+      _logger.i('DEBUG UPDATE: Row number: $rowNumber');
+      _logger.i('DEBUG UPDATE: Sheets row data: $sheetsRow');
+      _logger.i('DEBUG UPDATE: Checkout date in row: ${sheetsRow[6]}');
 
-        final rowNumber = index + 2; // +2 because of header row and 0-based index
-        final sheetsRow = book.toSheetsRow();
+      final valueRange = sheets.ValueRange.fromJson({
+        'values': [sheetsRow],
+      });
 
-        _logger.i('DEBUG UPDATE: Row number: $rowNumber');
-        _logger.i('DEBUG UPDATE: Sheets row data: $sheetsRow');
-        _logger.i('DEBUG UPDATE: Checkout date in row: ${sheetsRow[6]}');
+      final range =
+          '${AppConstants.bookInventorySheet}!A$rowNumber:G$rowNumber';
+      _logger.i('DEBUG UPDATE: Updating range: $range');
 
-        final valueRange = sheets.ValueRange.fromJson({
-          'values': [sheetsRow],
-        });
+      await _sheetsApi!.spreadsheets.values.update(
+        valueRange,
+        AppConstants.spreadsheetId,
+        range,
+        valueInputOption: 'USER_ENTERED',
+      );
 
-        final range = '${AppConstants.bookInventorySheet}!A$rowNumber:G$rowNumber';
-        _logger.i('DEBUG UPDATE: Updating range: $range');
+      _clearCache();
+      _logger.i('Book updated: ${book.bookId}');
+      return true;
+    });
+  }
 
-        await _sheetsApi!.spreadsheets.values.update(
-          valueRange,
-          AppConstants.spreadsheetId,
-          range,
-          valueInputOption: 'USER_ENTERED',
-        );
+  Future<int> _findBookRowNumber(String bookId) async {
+    const pageSize = 500;
+    var startRow = 2; // Skip header
+    final matches = <int>[];
+    final normalizedBookId = bookId.trim();
 
-        _clearCache();
-        _logger.i('Book updated: ${book.bookId}');
-        return true;
-      },
-    );
+    while (true) {
+      final endRow = startRow + pageSize - 1;
+      final range = '${AppConstants.bookInventorySheet}!A$startRow:G$endRow';
+      final response = await _sheetsApi!.spreadsheets.values.get(
+        AppConstants.spreadsheetId,
+        range,
+      );
+
+      final rows = response.values;
+      if (rows == null || rows.isEmpty) {
+        break;
+      }
+
+      matches.addAll(
+        findMatchingRowNumbersInBatch(
+          rows: rows,
+          startRow: startRow,
+          bookId: normalizedBookId,
+        ),
+      );
+
+      if (rows.length < pageSize) {
+        break;
+      }
+      startRow = endRow + 1;
+    }
+
+    if (matches.isEmpty) {
+      throw Exception('Book not found: $bookId');
+    }
+    if (matches.length > 1) {
+      throw Exception(
+        'Duplicate book IDs detected for "$bookId" at rows: ${matches.join(', ')}',
+      );
+    }
+
+    return matches.first;
+  }
+
+  @visibleForTesting
+  static List<int> findMatchingRowNumbersInBatch({
+    required List<List<dynamic>> rows,
+    required int startRow,
+    required String bookId,
+  }) {
+    final normalizedBookId = bookId.trim();
+    final matches = <int>[];
+    for (var index = 0; index < rows.length; index++) {
+      final row = rows[index];
+      if (row.isEmpty) continue;
+
+      final rawBookId = row.first.toString().trim();
+      if (rawBookId == normalizedBookId) {
+        matches.add(startRow + index);
+      }
+    }
+    return matches;
   }
 
   /// Checkout book
@@ -479,7 +562,9 @@ class GoogleSheetsService {
     }
 
     final checkoutDate = DateTime.now();
-    _logger.i('DEBUG CHECKOUT: Creating updated book with checkout date: $checkoutDate');
+    _logger.i(
+      'DEBUG CHECKOUT: Creating updated book with checkout date: $checkoutDate',
+    );
 
     final updatedBook = book.copyWith(
       status: BookStatus.checkedOut,
@@ -487,8 +572,12 @@ class GoogleSheetsService {
       checkoutDate: checkoutDate,
     );
 
-    _logger.i('DEBUG CHECKOUT: Updated book checkout date: ${updatedBook.checkoutDate}');
-    _logger.i('DEBUG CHECKOUT: Updated book sheets row: ${updatedBook.toSheetsRow()}');
+    _logger.i(
+      'DEBUG CHECKOUT: Updated book checkout date: ${updatedBook.checkoutDate}',
+    );
+    _logger.i(
+      'DEBUG CHECKOUT: Updated book sheets row: ${updatedBook.toSheetsRow()}',
+    );
 
     return updateBook(updatedBook);
   }
@@ -500,7 +589,10 @@ class GoogleSheetsService {
       throw Exception(AppConstants.errorBookNotFound);
     }
 
-    if (book.status != BookStatus.checkedOut) {
+    final isReturnable =
+        book.status == BookStatus.checkedOut ||
+        book.status == BookStatus.overdue;
+    if (!isReturnable) {
       throw Exception(AppConstants.errorNotCheckedOut);
     }
 
@@ -530,17 +622,28 @@ class GoogleSheetsService {
         }
 
         final totalBooks = books.length;
-        final availableBooks = books.where((b) => b.status == BookStatus.available).length;
-        final checkedOutBooks = books.where((b) => b.status == BookStatus.checkedOut).length;
+        final availableBooks = books
+            .where((b) => b.status == BookStatus.available)
+            .length;
+        final checkedOutBooks = books
+            .where((b) => b.status == BookStatus.checkedOut)
+            .length;
         final overdueBooks = books.where((b) => b.isOverdue).length;
-        final reservedBooks = books.where((b) => b.status == BookStatus.reserved).length;
-        final damagedBooks = books.where((b) => b.status == BookStatus.damaged).length;
-        final lostBooks = books.where((b) => b.status == BookStatus.lost).length;
+        final reservedBooks = books
+            .where((b) => b.status == BookStatus.reserved)
+            .length;
+        final damagedBooks = books
+            .where((b) => b.status == BookStatus.damaged)
+            .length;
+        final lostBooks = books
+            .where((b) => b.status == BookStatus.lost)
+            .length;
 
         // Books by category
         final booksByCategory = <String, int>{};
         for (final book in books) {
-          booksByCategory[book.category] = (booksByCategory[book.category] ?? 0) + 1;
+          booksByCategory[book.category] =
+              (booksByCategory[book.category] ?? 0) + 1;
         }
 
         // Books by shelf
@@ -556,10 +659,11 @@ class GoogleSheetsService {
           borrowerCounts[name] = (borrowerCounts[name] ?? 0) + 1;
         }
 
-        final topBorrowers = borrowerCounts.entries
-            .map((e) => TopBorrower(name: e.key, booksCheckedOut: e.value))
-            .toList()
-          ..sort((a, b) => b.booksCheckedOut.compareTo(a.booksCheckedOut));
+        final topBorrowers =
+            borrowerCounts.entries
+                .map((e) => TopBorrower(name: e.key, booksCheckedOut: e.value))
+                .toList()
+              ..sort((a, b) => b.booksCheckedOut.compareTo(a.booksCheckedOut));
 
         return LibraryStats(
           totalBooks: totalBooks,
@@ -627,7 +731,6 @@ class GoogleSheetsService {
   void dispose() {
     _connectionCheckTimer?.cancel();
     _connectionController.close();
-    _authClient?.close();
   }
 }
 

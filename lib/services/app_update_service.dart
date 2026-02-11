@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:crypto/crypto.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
@@ -54,7 +56,9 @@ class AppUpdateService {
         // Show update dialog
         await showUpdateDialog(context, updateInfo);
       } else {
-        debugPrint('❌ Update dialog NOT shown. updateInfo: ${updateInfo != null}, context.mounted: ${context.mounted}');
+        debugPrint(
+          '❌ Update dialog NOT shown. updateInfo: ${updateInfo != null}, context.mounted: ${context.mounted}',
+        );
       }
     } catch (e) {
       // Silent failure - app continues normally
@@ -64,6 +68,7 @@ class AppUpdateService {
 
   /// Manual update check (called from Settings button)
   static Future<void> checkForUpdatesManual(BuildContext context) async {
+    var loadingDialogVisible = false;
     try {
       // Check network connectivity first
       final connectivityResult = await Connectivity().checkConnectivity();
@@ -85,18 +90,20 @@ class AppUpdateService {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
       );
+      loadingDialogVisible = true;
 
       final updateInfo = await _fetchUpdateInfo().timeout(
         const Duration(seconds: 15),
       );
 
       // Close loading
-      if (context.mounted) {
+      if (context.mounted &&
+          loadingDialogVisible &&
+          Navigator.canPop(context)) {
         Navigator.pop(context);
+        loadingDialogVisible = false;
       }
 
       if (updateInfo != null && context.mounted) {
@@ -111,8 +118,13 @@ class AppUpdateService {
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      if (context.mounted &&
+          loadingDialogVisible &&
+          Navigator.canPop(context)) {
         Navigator.pop(context); // Close loading
+        loadingDialogVisible = false;
+      }
+      if (context.mounted) {
         await showPremiumErrorDialog(
           context,
           title: 'Update Check Failed',
@@ -143,13 +155,22 @@ class AppUpdateService {
       if (response.statusCode == 200) {
         debugPrint('✅ Response Body: ${response.body}');
 
-        final versionData = jsonDecode(response.body);
+        final versionData = _parseUpdateInfo(jsonDecode(response.body));
+        if (versionData == null) {
+          debugPrint(
+            '❌ version.json format invalid. Required keys: version, versionCode, downloadUrl, sha256',
+          );
+          return null;
+        }
+
         final latestVersionCode = versionData['versionCode'] as int;
         final latestVersion = versionData['version'] as String;
 
         debugPrint('☁️ Latest Version: $latestVersion');
         debugPrint('☁️ Latest Version Code: $latestVersionCode');
-        debugPrint('🔄 Comparison: $latestVersionCode > $currentVersionCode = ${latestVersionCode > currentVersionCode}');
+        debugPrint(
+          '🔄 Comparison: $latestVersionCode > $currentVersionCode = ${latestVersionCode > currentVersionCode}',
+        );
 
         // Check if update is needed
         if (latestVersionCode > currentVersionCode) {
@@ -177,9 +198,24 @@ class AppUpdateService {
   ) async {
     // Capture navigator before any async operations
     final navigator = Navigator.of(context);
+    var progressDialogVisible = false;
 
     try {
       final downloadUrl = updateInfo['downloadUrl'] as String;
+      final expectedSha256 = _normalizeExpectedSha256(updateInfo);
+
+      if (expectedSha256 == null) {
+        if (context.mounted) {
+          await showPremiumErrorDialog(
+            context,
+            title: 'Update Blocked',
+            message:
+                'This update is missing a valid security checksum (SHA-256).\n\nPlease contact support and try again later.',
+            icon: Icons.security_rounded,
+          );
+        }
+        return;
+      }
 
       // No permission needed for Android 11+ (uses app-specific storage)
       // Android 10 and below: Try to get permission, but continue anyway
@@ -193,6 +229,7 @@ class AppUpdateService {
         barrierDismissible: false, // Cannot dismiss by tapping outside
         builder: (ctx) => const DownloadProgressDialog(),
       );
+      progressDialogVisible = true;
 
       // Get download directory
       final directory = await getTemporaryDirectory();
@@ -210,7 +247,9 @@ class AppUpdateService {
       if (await file.exists()) {
         final fileSize = await file.length();
         final fileSizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(2);
-        debugPrint('🗑️  Deleting old APK (${fileSizeMB}MB) before downloading new one');
+        debugPrint(
+          '🗑️  Deleting old APK (${fileSizeMB}MB) before downloading new one',
+        );
         await file.delete();
         debugPrint('✅ Old APK deleted successfully');
       } else {
@@ -245,10 +284,14 @@ class AppUpdateService {
             downloadStatus.value = 'Downloading... $percentage%';
 
             // Log every 25% progress
-            if (percentage == '25' || percentage == '50' || percentage == '75') {
+            if (percentage == '25' ||
+                percentage == '50' ||
+                percentage == '75') {
               final receivedMB = (received / (1024 * 1024)).toStringAsFixed(2);
               final totalMB = (total / (1024 * 1024)).toStringAsFixed(2);
-              debugPrint('📊 Download Progress: $percentage% ($receivedMB MB / $totalMB MB)');
+              debugPrint(
+                '📊 Download Progress: $percentage% ($receivedMB MB / $totalMB MB)',
+              );
             }
           }
         },
@@ -256,29 +299,57 @@ class AppUpdateService {
 
       // Download complete - verify file
       final downloadedFile = File(filePath);
-      if (await downloadedFile.exists()) {
-        final fileSize = await downloadedFile.length();
-        final fileSizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(2);
-        debugPrint('✅ Download Complete!');
-        debugPrint('   File Size: ${fileSizeMB}MB');
-        debugPrint('   Saved at: $filePath');
-      } else {
-        debugPrint('❌ ERROR: Downloaded file not found at expected path!');
+      if (!await downloadedFile.exists()) {
+        throw Exception(
+          'Downloaded file not found at expected path: $filePath',
+        );
       }
 
-      // Download complete
-      downloadStatus.value = 'Download complete! Installing...';
+      final fileSize = await downloadedFile.length();
+      final fileSizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(2);
+      debugPrint('✅ Download Complete!');
+      debugPrint('   File Size: ${fileSizeMB}MB');
+      debugPrint('   Saved at: $filePath');
+
+      // Verify APK integrity before opening installer
+      downloadStatus.value = 'Verifying package integrity...';
+      final actualSha256 = await _calculateFileSha256(downloadedFile);
+      final isHashValid = actualSha256.toLowerCase() == expectedSha256;
+      if (!isHashValid) {
+        if (progressDialogVisible && navigator.canPop()) {
+          navigator.pop();
+          progressDialogVisible = false;
+        }
+        if (context.mounted) {
+          await showPremiumErrorDialog(
+            context,
+            title: 'Security Check Failed',
+            message:
+                'The downloaded update failed integrity verification and was blocked.\n\nExpected: $expectedSha256\nActual: $actualSha256',
+            icon: Icons.security_rounded,
+          );
+        }
+        return;
+      }
+
+      // Integrity verified
+      downloadStatus.value = 'Integrity verified. Installing...';
       downloadProgress.value = 1.0;
 
       // Close progress dialog
       await Future.delayed(const Duration(milliseconds: 500));
-      navigator.pop();
+      if (progressDialogVisible && navigator.canPop()) {
+        navigator.pop();
+        progressDialogVisible = false;
+      }
 
       // Install APK using platform channel (native Android method)
       debugPrint('📦 Opening installer for: $filePath');
 
       try {
-        const platform = MethodChannel('com.hfzy.khair_ul_madaaris_library/install');
+        const platform = MethodChannel(
+          'com.hfzy.khair_ul_madaaris_library/install',
+        );
         await platform.invokeMethod('installApk', {'filePath': filePath});
         debugPrint('✅ Installer opened successfully');
 
@@ -323,26 +394,33 @@ class AppUpdateService {
 
       if (e.response?.statusCode == 404) {
         title = 'Update Not Available';
-        message = 'The update file is currently unavailable. Please check back later or contact support.';
+        message =
+            'The update file is currently unavailable. Please check back later or contact support.';
       } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.sendTimeout) {
         title = 'Download Timed Out';
-        message = 'The download took too long. Please check your internet connection and try again.';
+        message =
+            'The download took too long. Please check your internet connection and try again.';
       } else if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.unknown) {
         title = 'Connection Error';
-        message = 'Unable to connect to the server. Please check your internet connection and try again.';
+        message =
+            'Unable to connect to the server. Please check your internet connection and try again.';
       } else if (e.type == DioExceptionType.cancel) {
         title = 'Download Cancelled';
-        message = 'The download was cancelled. You can try again from Settings.';
+        message =
+            'The download was cancelled. You can try again from Settings.';
       }
 
       // Close progress dialog and show error
       try {
         debugPrint('🔴 Closing download dialog...');
-        navigator.pop();
-        debugPrint('✅ Download dialog closed');
+        if (progressDialogVisible && navigator.canPop()) {
+          navigator.pop();
+          progressDialogVisible = false;
+          debugPrint('✅ Download dialog closed');
+        }
       } catch (e) {
         debugPrint('❌ Failed to close dialog: $e');
       }
@@ -350,7 +428,9 @@ class AppUpdateService {
       // Small delay to let dialog close
       await Future.delayed(const Duration(milliseconds: 300));
 
-      debugPrint('📢 Attempting to show error dialog. context.mounted: ${context.mounted}');
+      debugPrint(
+        '📢 Attempting to show error dialog. context.mounted: ${context.mounted}',
+      );
 
       try {
         if (context.mounted) {
@@ -372,12 +452,17 @@ class AppUpdateService {
       debugPrint('Unexpected error during update: $e');
 
       // Close progress dialog and show error
-      navigator.pop();
+      if (progressDialogVisible && navigator.canPop()) {
+        navigator.pop();
+        progressDialogVisible = false;
+      }
 
       // Small delay to let dialog close
       await Future.delayed(const Duration(milliseconds: 300));
 
-      debugPrint('📢 Attempting to show error dialog. context.mounted: ${context.mounted}');
+      debugPrint(
+        '📢 Attempting to show error dialog. context.mounted: ${context.mounted}',
+      );
 
       if (context.mounted) {
         debugPrint('✅ Showing unexpected error dialog');
@@ -393,6 +478,75 @@ class AppUpdateService {
     }
   }
 
+  static Map<String, dynamic>? _parseUpdateInfo(dynamic jsonData) {
+    if (jsonData is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final versionCode = jsonData['versionCode'];
+    final version = jsonData['version'];
+    final downloadUrl = jsonData['downloadUrl'];
+    final sha256 = jsonData['sha256'];
+
+    if (versionCode is! int ||
+        version is! String ||
+        downloadUrl is! String ||
+        downloadUrl.trim().isEmpty ||
+        sha256 is! String ||
+        !_isValidSha256(sha256.trim().toLowerCase())) {
+      return null;
+    }
+
+    return Map<String, dynamic>.from(jsonData);
+  }
+
+  static String? _normalizeExpectedSha256(Map<String, dynamic> updateInfo) {
+    final value = updateInfo['sha256'];
+    if (value is! String) return null;
+    final normalized = value.trim().toLowerCase();
+    if (!_isValidSha256(normalized)) return null;
+    return normalized;
+  }
+
+  static bool _isValidSha256(String value) {
+    return RegExp(r'^[a-f0-9]{64}$').hasMatch(value);
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic>? parseUpdateInfoForTesting(dynamic jsonData) {
+    return _parseUpdateInfo(jsonData);
+  }
+
+  @visibleForTesting
+  static String? normalizeExpectedSha256ForTesting(
+    Map<String, dynamic> updateInfo,
+  ) {
+    return _normalizeExpectedSha256(updateInfo);
+  }
+
+  @visibleForTesting
+  static bool verifySha256ForTesting({
+    required Uint8List bytes,
+    required Map<String, dynamic> updateInfo,
+  }) {
+    final expectedSha256 = _normalizeExpectedSha256(updateInfo);
+    if (expectedSha256 == null) {
+      return false;
+    }
+    final actualSha256 = sha256FromBytes(bytes);
+    return actualSha256.toLowerCase() == expectedSha256;
+  }
+
+  @visibleForTesting
+  static String sha256FromBytes(Uint8List bytes) {
+    return sha256.convert(bytes).toString();
+  }
+
+  static Future<String> _calculateFileSha256(File file) async {
+    final bytes = await file.readAsBytes();
+    return sha256FromBytes(bytes);
+  }
+
   /// Show update dialog
   static Future<void> showUpdateDialog(
     BuildContext context,
@@ -404,7 +558,6 @@ class AppUpdateService {
       builder: (ctx) => UpdateDialog(updateInfo: updateInfo),
     );
   }
-
 
   /// Clean up old APK files (called on app startup)
   ///
@@ -432,7 +585,9 @@ class AppUpdateService {
           debugPrint('   ✅ Old APK deleted successfully');
           debugPrint('   Storage freed: ${fileSizeMB}MB');
         } else {
-          debugPrint('   ℹ️  No old APK found (already cleaned or never existed)');
+          debugPrint(
+            '   ℹ️  No old APK found (already cleaned or never existed)',
+          );
         }
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       } catch (e) {

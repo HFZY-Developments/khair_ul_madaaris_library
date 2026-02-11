@@ -1,8 +1,41 @@
+import java.io.File
+import java.util.Properties
+import org.gradle.api.GradleException
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+val releaseTasksRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+val requiredSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val missingSigningKeys = requiredSigningKeys.filter {
+    keystoreProperties.getProperty(it).isNullOrBlank()
+}
+val releaseSigningConfigured = keystorePropertiesFile.exists() && missingSigningKeys.isEmpty()
+
+if (releaseTasksRequested && !releaseSigningConfigured) {
+    throw GradleException(
+        buildString {
+            appendLine("Release signing is required for production builds.")
+            appendLine("Missing configuration in android/key.properties.")
+            appendLine("Required keys: ${requiredSigningKeys.joinToString(", ")}")
+            appendLine("Found file: ${keystorePropertiesFile.absolutePath}")
+            appendLine(
+                "Use the same signing key as your installed production app for in-place updates."
+            )
+        }
+    )
 }
 
 android {
@@ -11,12 +44,12 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -32,30 +65,37 @@ android {
         versionName = flutter.versionName
     }
 
-    // Signing configuration (for production release)
-    // TODO: For production deployment, create a keystore and configure signing:
-    // 1. Generate keystore: keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-    // 2. Create android/key.properties with: storePassword, keyPassword, keyAlias, storeFile
-    // 3. Uncomment and configure the signingConfigs block below
-
-    /*
     signingConfigs {
-        create("release") {
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+        if (releaseSigningConfigured) {
+            create("release") {
+                val rawStoreFile = keystoreProperties.getProperty("storeFile")
+                val resolvedStoreFile = if (File(rawStoreFile).isAbsolute) {
+                    File(rawStoreFile)
+                } else {
+                    rootProject.file(rawStoreFile)
+                }
+
+                if (!resolvedStoreFile.exists()) {
+                    throw GradleException(
+                        "Release keystore not found: ${resolvedStoreFile.absolutePath}"
+                    )
+                }
+
+                storeFile = resolvedStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
         }
     }
-    */
 
     buildTypes {
         release {
-            // Currently using debug signing for development
-            // IMPORTANT: For production, configure proper signing (see TODO above)
-            signingConfig = signingConfigs.getByName("debug")
-            // TODO: Uncomment when release signing is configured
-            // signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

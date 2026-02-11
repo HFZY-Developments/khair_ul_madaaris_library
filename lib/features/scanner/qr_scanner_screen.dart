@@ -5,12 +5,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:vibration/vibration.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/responsive.dart';
+import '../../core/widgets/ambient_motion_background.dart';
 import '../../core/widgets/premium_dialogs.dart';
 import '../../services/google_sheets_service.dart';
 import '../../models/book.dart';
-import '../../core/widgets/gradient_button.dart';
+import 'scan_flow.dart';
 
 class QRScannerScreen extends StatefulWidget {
   final bool isAdmin;
@@ -36,9 +35,42 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR Code'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Scan QR Code'),
+            Text(
+              widget.isAdmin
+                  ? 'Admin: add, checkout, return'
+                  : 'Checkout and return flow',
+              style: TextStyle(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w500,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: widget.isAdmin
+                  ? [AppColors.primaryDarkBlue, AppColors.primaryTeal]
+                  : [AppColors.primaryTeal, AppColors.primaryDarkBlue],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on_rounded),
@@ -83,11 +115,22 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               _handleQRCode(code);
             },
           ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AmbientMotionBackground(
+                isDark: isDark,
+                compact: true,
+                alphaScale: 0.35,
+              ),
+            ),
+          ),
 
           // Overlay
           CustomPaint(
             painter: ScannerOverlayPainter(
-              color: widget.isAdmin ? AppColors.primaryLime : AppColors.primaryTeal,
+              color: widget.isAdmin
+                  ? AppColors.primaryLime
+                  : AppColors.primaryTeal,
             ),
             child: Container(),
           ),
@@ -95,53 +138,59 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           // Elegant checkmark animation overlay (EXACT MATCH to original - gradient circle with white check)
           if (_showCheckmark)
             Container(
-              color: Colors.black.withValues(alpha: 0.7),
-              child: Center(
-                child: Container(
-                  width: 200.w,
-                  height: 200.h,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primaryTeal, AppColors.primaryLime],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryTeal.withValues(alpha: 0.6),
-                        blurRadius: 80,
-                        spreadRadius: 20,
-                        offset: const Offset(0, 0),
+                  color: Colors.black.withValues(alpha: 0.7),
+                  child: Center(
+                    child: Container(
+                      width: 200.w,
+                      height: 200.h,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            AppColors.primaryTeal,
+                            AppColors.primaryLime,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryTeal.withValues(alpha: 0.6),
+                            blurRadius: 80,
+                            spreadRadius: 20,
+                            offset: const Offset(0, 0),
+                          ),
+                          BoxShadow(
+                            color: AppColors.primaryLime.withValues(alpha: 0.4),
+                            blurRadius: 120,
+                            spreadRadius: 30,
+                            offset: const Offset(0, 0),
+                          ),
+                        ],
                       ),
-                      BoxShadow(
-                        color: AppColors.primaryLime.withValues(alpha: 0.4),
-                        blurRadius: 120,
-                        spreadRadius: 30,
-                        offset: const Offset(0, 0),
+                      child: Container(
+                        margin: EdgeInsets.all(50.w),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          color: AppColors.primaryTeal,
+                          size: 70.sp,
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Container(
-                    margin: EdgeInsets.all(50.w),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_rounded,
-                      color: AppColors.primaryTeal,
-                      size: 70.sp,
                     ),
                   ),
+                )
+                .animate()
+                .fadeIn(duration: 200.ms)
+                .scale(
+                  begin: const Offset(0.7, 0.7),
+                  end: const Offset(1.0, 1.0),
+                  duration: 300.ms,
+                  curve: Curves.easeOutBack,
                 ),
-              ),
-            ).animate().fadeIn(duration: 200.ms).scale(
-              begin: const Offset(0.7, 0.7),
-              end: const Offset(1.0, 1.0),
-              duration: 300.ms,
-              curve: Curves.easeOutBack,
-            ),
 
           // Instructions
           Positioned(
@@ -172,6 +221,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   }
 
   Future<void> _handleQRCode(String qrCode) async {
+    var lookupDialogShown = false;
     try {
       print('DEBUG: Starting _handleQRCode for: $qrCode');
 
@@ -196,19 +246,26 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
       // Show loading dialog while fetching book data
       showPremiumLoadingDialog(context, message: 'Looking up book...');
+      lookupDialogShown = true;
 
       print('DEBUG: Fetching book from Google Sheets with FORCE REFRESH...');
       // CRITICAL: Force refresh to get latest data from sheets (including checkout dates!)
-      final book = await GoogleSheetsService.instance.getBookById(qrCode, forceRefresh: true);
+      final book = await GoogleSheetsService.instance.getBookById(
+        qrCode,
+        forceRefresh: true,
+      );
       print('DEBUG: Book fetched: ${book?.title ?? "NOT FOUND"}');
       if (book != null) {
-        print('DEBUG: Book details - ID: ${book.bookId}, Title: "${book.title}", Shelf: "${book.shelf}", Category: "${book.category}"');
+        print(
+          'DEBUG: Book details - ID: ${book.bookId}, Title: "${book.title}", Shelf: "${book.shelf}", Category: "${book.category}"',
+        );
         print('DEBUG: Book checkout date: ${book.checkoutDate}');
       }
 
       // Dismiss loading dialog
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
+        lookupDialogShown = false;
       }
 
       if (!mounted) return;
@@ -223,7 +280,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             await showPremiumErrorDialog(
               context,
               title: 'Invalid Library Code',
-              message: 'Only library QR codes starting with "LIB" can be added to the system.\n\nScanned code: $qrCode\n\nPlease use official library QR codes only.',
+              message:
+                  'Only library QR codes starting with "LIB" can be added to the system.\n\nScanned code: $qrCode\n\nPlease use official library QR codes only.',
               icon: Icons.block_rounded,
             );
             setState(() => _isProcessing = false);
@@ -234,18 +292,22 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           await showPremiumErrorDialog(
             context,
             title: 'Book Not Found',
-            message: 'Book with ID "$qrCode" is not registered in the system.\n\nPlease contact the administrator.',
+            message:
+                'Book with ID "$qrCode" is not registered in the system.\n\nPlease contact the administrator.',
             icon: Icons.search_off_rounded,
           );
         }
       } else {
         // CRITICAL: Check if book is incomplete (missing title, shelf, or category)
-        final isIncomplete = book.title.trim().isEmpty ||
-                             book.shelf.trim().isEmpty ||
-                             book.category.trim().isEmpty;
+        final isIncomplete =
+            book.title.trim().isEmpty ||
+            book.shelf.trim().isEmpty ||
+            book.category.trim().isEmpty;
 
         if (isIncomplete) {
-          print('DEBUG: Book is incomplete - title: "${book.title}", shelf: "${book.shelf}", category: "${book.category}"');
+          print(
+            'DEBUG: Book is incomplete - title: "${book.title}", shelf: "${book.shelf}", category: "${book.category}"',
+          );
           if (widget.isAdmin) {
             // Admin can edit incomplete book
             await _showEditIncompleteBookDialog(book);
@@ -254,38 +316,43 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             await showPremiumErrorDialog(
               context,
               title: 'Book Not Found',
-              message: 'Book with ID "$qrCode" is not properly registered.\n\nPlease contact the administrator to complete the book registration.',
+              message:
+                  'Book with ID "$qrCode" is not properly registered.\n\nPlease contact the administrator to complete the book registration.',
               icon: Icons.search_off_rounded,
             );
           }
           return;
         }
 
-        // Book found and complete - show action based on status (both admin and normal user)
+        // Book found and complete - choose next scanner action from status.
+        // This keeps overdue books in return flow instead of bouncing to checkout.
         print('DEBUG: Book status: ${book.status}');
-        if (book.status == BookStatus.available) {
-          // Show checkout dialog with book details integrated
-          await _showCheckoutDialog(book);
-        } else if (book.status == BookStatus.checkedOut) {
-          // Show return dialog with book details integrated
-          await _showReturnDialog(book);
-        } else {
-          // Book unavailable (damaged, lost, etc.)
-          await showPremiumErrorDialog(
-            context,
-            title: 'Book Unavailable',
-            message: 'This book is currently ${book.statusText.toLowerCase()} and cannot be borrowed.',
-            icon: Icons.block_rounded,
-          );
+        switch (resolveScannerAction(book.status)) {
+          case ScannerAction.checkout:
+            await _showCheckoutDialog(book);
+            break;
+          case ScannerAction.returnBook:
+            await _showReturnDialog(book);
+            break;
+          case ScannerAction.unavailable:
+            await showPremiumErrorDialog(
+              context,
+              title: 'Book Unavailable',
+              message:
+                  'This book is currently ${book.statusText.toLowerCase()} and cannot be borrowed.',
+              icon: Icons.block_rounded,
+            );
+            break;
         }
       }
     } catch (e, stackTrace) {
       print('DEBUG: Error in _handleQRCode: $e');
       print('DEBUG: Stack trace: $stackTrace');
 
-      // Dismiss any showing dialogs
-      while (mounted && Navigator.canPop(context)) {
+      // Dismiss only the lookup loading dialog opened by this method.
+      if (lookupDialogShown && mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
+        lookupDialogShown = false;
       }
 
       if (!mounted) return;
@@ -313,199 +380,230 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     await showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 40.h),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
           child: SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
             child: Container(
               padding: EdgeInsets.all(28.w),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.limeGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.add_circle_rounded,
-                      color: AppColors.primaryDarkBlue,
-                      size: 28.sp,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add New Book',
-                          style: TextStyle(
-                            fontSize: 22.sp,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.limeGradient,
+                          shape: BoxShape.circle,
                         ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'ID: $bookId',
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
+                        child: Icon(
+                          Icons.add_circle_rounded,
+                          color: AppColors.primaryDarkBlue,
+                          size: 28.sp,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 28.h),
-
-              // Form fields
-              TextField(
-                controller: titleController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Book Title *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.book_rounded),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: shelfController,
-                decoration: InputDecoration(
-                  labelText: 'Shelf Location',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.menu_book_rounded),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: categoryController,
-                decoration: InputDecoration(
-                  labelText: 'Category/Genre',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.category_rounded),
-                ),
-              ),
-              SizedBox(height: 28.h),
-
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Add New Book',
+                              style: TextStyle(
+                                fontSize: 22.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              'ID: $bookId',
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 12.w),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (titleController.text.trim().isEmpty) {
-                        await showPremiumErrorDialog(
-                          context,
-                          title: 'Validation Error',
-                          message: 'Book title is required.',
-                          icon: Icons.warning_rounded,
-                        );
-                        return;
-                      }
+                  SizedBox(height: 28.h),
 
-                      // Close dialog first
-                      Navigator.pop(context);
-
-                      // Show loading
-                      showPremiumLoadingDialog(context, message: 'Adding book...');
-
-                      try {
-                        final book = Book(
-                          bookId: bookId,
-                          title: titleController.text.trim(),
-                          author: '',
-                          category: categoryController.text.trim(),
-                          shelf: shelfController.text.trim(),
-                          status: BookStatus.available,
-                          addedDate: DateTime.now(),
-                        );
-
-                        final success = await GoogleSheetsService.instance.addBook(book);
-
-                        // Dismiss loading
-                        if (mounted) Navigator.pop(context);
-
-                        if (!mounted) return;
-
-                        if (success) {
-                          await showPremiumSuccessDialog(
-                            context,
-                            title: 'Book Added!',
-                            message: '${book.title} has been successfully added to the library.',
-                            icon: Icons.check_circle_rounded,
-                            onPrimaryPressed: () {
-                              Navigator.pop(context); // Close success
-                              Navigator.pop(context); // Close scanner
-                            },
-                          );
-                        } else {
-                          await showPremiumErrorDialog(
-                            context,
-                            title: 'Failed',
-                            message: 'Could not add the book. Please try again.',
-                            icon: Icons.error_rounded,
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted && Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-
-                        if (!mounted) return;
-
-                        await showPremiumErrorDialog(
-                          context,
-                          title: 'Error',
-                          message: 'An error occurred:\n${e.toString()}',
-                          icon: Icons.error_outline_rounded,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryLime,
-                      foregroundColor: AppColors.primaryDarkBlue,
-                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 14.h),
-                      shape: RoundedRectangleBorder(
+                  // Form fields
+                  TextField(
+                    controller: titleController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Book Title *',
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                       ),
-                    ),
-                    child: Text(
-                      'Add Book',
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      prefixIcon: const Icon(Icons.book_rounded),
                     ),
                   ),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: shelfController,
+                    decoration: InputDecoration(
+                      labelText: 'Shelf Location',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      prefixIcon: const Icon(Icons.menu_book_rounded),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: categoryController,
+                    decoration: InputDecoration(
+                      labelText: 'Category/Genre',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      prefixIcon: const Icon(Icons.category_rounded),
+                    ),
+                  ),
+                  SizedBox(height: 28.h),
+
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final widgetContext = this.context;
+                          var loadingDialogVisible = false;
+
+                          if (titleController.text.trim().isEmpty) {
+                            await showPremiumErrorDialog(
+                              context,
+                              title: 'Validation Error',
+                              message: 'Book title is required.',
+                              icon: Icons.warning_rounded,
+                            );
+                            return;
+                          }
+
+                          // Close dialog first
+                          Navigator.pop(context);
+
+                          if (!mounted) return;
+
+                          // Show loading
+                          showPremiumLoadingDialog(
+                            widgetContext,
+                            message: 'Adding book...',
+                          );
+                          loadingDialogVisible = true;
+
+                          try {
+                            final book = Book(
+                              bookId: bookId,
+                              title: titleController.text.trim(),
+                              author: '',
+                              category: categoryController.text.trim(),
+                              shelf: shelfController.text.trim(),
+                              status: BookStatus.available,
+                              addedDate: DateTime.now(),
+                            );
+
+                            final success = await GoogleSheetsService.instance
+                                .addBook(book);
+
+                            // Dismiss loading
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
+                            }
+
+                            if (!mounted) return;
+
+                            if (success) {
+                              await showPremiumSuccessDialog(
+                                widgetContext,
+                                title: 'Book Added!',
+                                message:
+                                    '${book.title} has been successfully added to the library.',
+                                icon: Icons.check_circle_rounded,
+                              );
+                            } else {
+                              await showPremiumErrorDialog(
+                                widgetContext,
+                                title: 'Failed',
+                                message:
+                                    'Could not add the book. Please try again.',
+                                icon: Icons.error_rounded,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
+                            }
+
+                            if (!mounted) return;
+
+                            await showPremiumErrorDialog(
+                              widgetContext,
+                              title: 'Error',
+                              message: 'An error occurred:\n${e.toString()}',
+                              icon: Icons.error_outline_rounded,
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryLime,
+                          foregroundColor: AppColors.primaryDarkBlue,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 28.w,
+                            vertical: 14.h,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                        ),
+                        child: Text(
+                          'Add Book',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
-          ), // Column
-        ), // Container
+              ), // Column
+            ), // Container
           ), // SingleChildScrollView
-          ), // ConstrainedBox
+        ), // ConstrainedBox
       ), // Dialog
     ); // showDialog
   }
@@ -513,263 +611,314 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   /// Show dialog to edit incomplete book details (admin only)
   Future<void> _showEditIncompleteBookDialog(Book incompleteBook) async {
     final titleController = TextEditingController(text: incompleteBook.title);
-    final categoryController = TextEditingController(text: incompleteBook.category);
+    final categoryController = TextEditingController(
+      text: incompleteBook.category,
+    );
     final shelfController = TextEditingController(text: incompleteBook.shelf);
 
     await showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 40.h),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
           child: SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
             child: Container(
               padding: EdgeInsets.all(28.w),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.limeGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.edit_rounded,
-                      color: AppColors.primaryDarkBlue,
-                      size: 28.sp,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Complete Book Details',
-                          style: TextStyle(
-                            fontSize: 22.sp,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.limeGradient,
+                          shape: BoxShape.circle,
                         ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'ID: ${incompleteBook.bookId}',
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
+                        child: Icon(
+                          Icons.edit_rounded,
+                          color: AppColors.primaryDarkBlue,
+                          size: 28.sp,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 28.h),
-
-              // Form fields
-              TextField(
-                controller: titleController,
-                autofocus: incompleteBook.title.trim().isEmpty,
-                decoration: InputDecoration(
-                  labelText: 'Book Title *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.book_rounded),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: shelfController,
-                autofocus: incompleteBook.title.trim().isNotEmpty && incompleteBook.shelf.trim().isEmpty,
-                decoration: InputDecoration(
-                  labelText: 'Shelf Location *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.menu_book_rounded),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: categoryController,
-                autofocus: incompleteBook.title.trim().isNotEmpty &&
-                          incompleteBook.shelf.trim().isNotEmpty &&
-                          incompleteBook.category.trim().isEmpty,
-                decoration: InputDecoration(
-                  labelText: 'Category/Genre *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                  prefixIcon: const Icon(Icons.category_rounded),
-                ),
-              ),
-              SizedBox(height: 28.h),
-
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Complete Book Details',
+                              style: TextStyle(
+                                fontSize: 22.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              'ID: ${incompleteBook.bookId}',
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 12.w),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final dialogContext = context; // Capture dialog context
+                  SizedBox(height: 28.h),
 
-                      // Validate all required fields
-                      if (titleController.text.trim().isEmpty) {
-                        await showPremiumErrorDialog(
-                          dialogContext,
-                          title: 'Validation Error',
-                          message: 'Book title is required.',
-                          icon: Icons.warning_rounded,
-                        );
-                        return;
-                      }
-
-                      if (shelfController.text.trim().isEmpty) {
-                        await showPremiumErrorDialog(
-                          dialogContext,
-                          title: 'Validation Error',
-                          message: 'Shelf location is required.',
-                          icon: Icons.warning_rounded,
-                        );
-                        return;
-                      }
-
-                      if (categoryController.text.trim().isEmpty) {
-                        await showPremiumErrorDialog(
-                          dialogContext,
-                          title: 'Validation Error',
-                          message: 'Category/Genre is required.',
-                          icon: Icons.warning_rounded,
-                        );
-                        return;
-                      }
-
-                      // Close edit dialog first
-                      Navigator.of(dialogContext).pop();
-
-                      // Show loading (using scanner screen context via mounted state)
-                      if (!mounted) return;
-                      showPremiumLoadingDialog(this.context, message: 'Updating book...');
-
-                      try {
-                        print('DEBUG EDIT: Updating incomplete book - ID: ${incompleteBook.bookId}');
-                        print('DEBUG EDIT: New values - Title: "${titleController.text.trim()}", Shelf: "${shelfController.text.trim()}", Category: "${categoryController.text.trim()}"');
-
-                        // Create updated book with complete details
-                        final updatedBook = Book(
-                          bookId: incompleteBook.bookId,
-                          title: titleController.text.trim(),
-                          author: incompleteBook.author,
-                          category: categoryController.text.trim(),
-                          shelf: shelfController.text.trim(),
-                          status: incompleteBook.status,
-                          borrowerName: incompleteBook.borrowerName,
-                          checkoutDate: incompleteBook.checkoutDate,
-                          addedDate: incompleteBook.addedDate,
-                        );
-
-                        print('DEBUG EDIT: Calling updateBook...');
-                        final success = await GoogleSheetsService.instance.updateBook(updatedBook).timeout(
-                          const Duration(seconds: 30),
-                          onTimeout: () {
-                            print('DEBUG EDIT: updateBook TIMED OUT after 30 seconds');
-                            throw Exception('Update operation timed out. Please check your internet connection and try again.');
-                          },
-                        );
-                        print('DEBUG EDIT: updateBook returned: $success');
-
-                        // Dismiss loading dialog
-                        print('DEBUG EDIT: About to dismiss loading, mounted=$mounted');
-                        if (!mounted) return;
-                        Navigator.of(this.context).pop();
-                        print('DEBUG EDIT: Loading dismissed');
-
-                        print('DEBUG EDIT: Checking mounted again, mounted=$mounted');
-                        if (!mounted) return;
-
-                        print('DEBUG EDIT: About to show success dialog, success=$success');
-                        if (success) {
-                          // Success! Double vibration pattern like checkout/return
-                          print('DEBUG EDIT: Triggering success vibration');
-                          if (await Vibration.hasVibrator() ?? false) {
-                            Vibration.vibrate(pattern: [0, 100, 100, 100]);
-                          }
-
-                          print('DEBUG EDIT: Showing success dialog with scanner context');
-                          await showPremiumSuccessDialog(
-                            this.context,
-                            title: 'Book Details Updated!',
-                            message: '${updatedBook.title} has been successfully registered in the library.\n\nBook ID: ${updatedBook.bookId}\nShelf: ${updatedBook.shelf}\nCategory: ${updatedBook.category}',
-                            icon: Icons.check_circle_rounded,
-                            onPrimaryPressed: () {
-                              print('DEBUG EDIT: Success dialog - Done button pressed');
-                              Navigator.of(this.context).pop(); // Close success dialog ONLY (stay in scanner!)
-                            },
-                          );
-                          print('DEBUG EDIT: Success dialog closed');
-                        } else {
-                          print('DEBUG EDIT: Showing error dialog');
-                          await showPremiumErrorDialog(
-                            this.context,
-                            title: 'Failed',
-                            message: 'Could not update the book. Please try again.',
-                            icon: Icons.error_rounded,
-                          );
-                        }
-                      } catch (e) {
-                        print('DEBUG EDIT: Error caught: $e');
-                        // Dismiss loading if still showing
-                        if (mounted) {
-                          Navigator.of(this.context).pop();
-                        }
-
-                        if (!mounted) return;
-
-                        await showPremiumErrorDialog(
-                          this.context,
-                          title: 'Error',
-                          message: 'An error occurred:\n${e.toString()}',
-                          icon: Icons.error_outline_rounded,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryLime,
-                      foregroundColor: AppColors.primaryDarkBlue,
-                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 14.h),
-                      shape: RoundedRectangleBorder(
+                  // Form fields
+                  TextField(
+                    controller: titleController,
+                    autofocus: incompleteBook.title.trim().isEmpty,
+                    decoration: InputDecoration(
+                      labelText: 'Book Title *',
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                       ),
-                    ),
-                    child: Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      prefixIcon: const Icon(Icons.book_rounded),
                     ),
                   ),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: shelfController,
+                    autofocus:
+                        incompleteBook.title.trim().isNotEmpty &&
+                        incompleteBook.shelf.trim().isEmpty,
+                    decoration: InputDecoration(
+                      labelText: 'Shelf Location *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      prefixIcon: const Icon(Icons.menu_book_rounded),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: categoryController,
+                    autofocus:
+                        incompleteBook.title.trim().isNotEmpty &&
+                        incompleteBook.shelf.trim().isNotEmpty &&
+                        incompleteBook.category.trim().isEmpty,
+                    decoration: InputDecoration(
+                      labelText: 'Category/Genre *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      prefixIcon: const Icon(Icons.category_rounded),
+                    ),
+                  ),
+                  SizedBox(height: 28.h),
+
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final dialogContext =
+                              context; // Capture dialog context
+                          final widgetContext = this.context;
+                          var loadingDialogVisible = false;
+
+                          // Validate all required fields
+                          if (titleController.text.trim().isEmpty) {
+                            await showPremiumErrorDialog(
+                              dialogContext,
+                              title: 'Validation Error',
+                              message: 'Book title is required.',
+                              icon: Icons.warning_rounded,
+                            );
+                            return;
+                          }
+
+                          if (shelfController.text.trim().isEmpty) {
+                            await showPremiumErrorDialog(
+                              dialogContext,
+                              title: 'Validation Error',
+                              message: 'Shelf location is required.',
+                              icon: Icons.warning_rounded,
+                            );
+                            return;
+                          }
+
+                          if (categoryController.text.trim().isEmpty) {
+                            await showPremiumErrorDialog(
+                              dialogContext,
+                              title: 'Validation Error',
+                              message: 'Category/Genre is required.',
+                              icon: Icons.warning_rounded,
+                            );
+                            return;
+                          }
+
+                          // Close edit dialog first
+                          Navigator.of(dialogContext).pop();
+
+                          // Show loading (using scanner screen context via mounted state)
+                          if (!mounted) return;
+                          showPremiumLoadingDialog(
+                            widgetContext,
+                            message: 'Updating book...',
+                          );
+                          loadingDialogVisible = true;
+
+                          try {
+                            print(
+                              'DEBUG EDIT: Updating incomplete book - ID: ${incompleteBook.bookId}',
+                            );
+                            print(
+                              'DEBUG EDIT: New values - Title: "${titleController.text.trim()}", Shelf: "${shelfController.text.trim()}", Category: "${categoryController.text.trim()}"',
+                            );
+
+                            // Create updated book with complete details
+                            final updatedBook = Book(
+                              bookId: incompleteBook.bookId,
+                              title: titleController.text.trim(),
+                              author: incompleteBook.author,
+                              category: categoryController.text.trim(),
+                              shelf: shelfController.text.trim(),
+                              status: incompleteBook.status,
+                              borrowerName: incompleteBook.borrowerName,
+                              checkoutDate: incompleteBook.checkoutDate,
+                              addedDate: incompleteBook.addedDate,
+                            );
+
+                            print('DEBUG EDIT: Calling updateBook...');
+                            final success = await GoogleSheetsService.instance
+                                .updateBook(updatedBook)
+                                .timeout(
+                                  const Duration(seconds: 30),
+                                  onTimeout: () {
+                                    print(
+                                      'DEBUG EDIT: updateBook TIMED OUT after 30 seconds',
+                                    );
+                                    throw Exception(
+                                      'Update operation timed out. Please check your internet connection and try again.',
+                                    );
+                                  },
+                                );
+                            print('DEBUG EDIT: updateBook returned: $success');
+
+                            // Dismiss loading dialog
+                            print(
+                              'DEBUG EDIT: About to dismiss loading, mounted=$mounted',
+                            );
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
+                            }
+                            if (!mounted) return;
+                            print('DEBUG EDIT: Loading dismissed');
+
+                            print(
+                              'DEBUG EDIT: Checking mounted again, mounted=$mounted',
+                            );
+                            if (!mounted) return;
+
+                            print(
+                              'DEBUG EDIT: About to show success dialog, success=$success',
+                            );
+                            if (success) {
+                              // Success! Double vibration pattern like checkout/return
+                              print('DEBUG EDIT: Triggering success vibration');
+                              if (await Vibration.hasVibrator() ?? false) {
+                                Vibration.vibrate(pattern: [0, 100, 100, 100]);
+                              }
+
+                              print(
+                                'DEBUG EDIT: Showing success dialog with scanner context',
+                              );
+                              await showPremiumSuccessDialog(
+                                widgetContext,
+                                title: 'Book Details Updated!',
+                                message:
+                                    '${updatedBook.title} has been successfully registered in the library.\n\nBook ID: ${updatedBook.bookId}\nShelf: ${updatedBook.shelf}\nCategory: ${updatedBook.category}',
+                                icon: Icons.check_circle_rounded,
+                              );
+                              print('DEBUG EDIT: Success dialog closed');
+                            } else {
+                              print('DEBUG EDIT: Showing error dialog');
+                              await showPremiumErrorDialog(
+                                widgetContext,
+                                title: 'Failed',
+                                message:
+                                    'Could not update the book. Please try again.',
+                                icon: Icons.error_rounded,
+                              );
+                            }
+                          } catch (e) {
+                            print('DEBUG EDIT: Error caught: $e');
+                            // Dismiss loading if still showing
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
+                            }
+
+                            if (!mounted) return;
+
+                            await showPremiumErrorDialog(
+                              widgetContext,
+                              title: 'Error',
+                              message: 'An error occurred:\n${e.toString()}',
+                              icon: Icons.error_outline_rounded,
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryLime,
+                          foregroundColor: AppColors.primaryDarkBlue,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 28.w,
+                            vertical: 14.h,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                        ),
+                        child: Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
-          ), // Column
-        ), // Container
+              ), // Column
+            ), // Container
           ), // SingleChildScrollView
-          ), // ConstrainedBox
+        ), // ConstrainedBox
       ), // Dialog
     ); // showDialog
   }
@@ -792,8 +941,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             color: isWarning
                 ? Colors.red.withValues(alpha: 0.2)
                 : (isDark
-                    ? AppColors.primaryTeal.withValues(alpha: 0.2)
-                    : AppColors.primaryTeal.withValues(alpha: 0.1)),
+                      ? AppColors.primaryTeal.withValues(alpha: 0.2)
+                      : AppColors.primaryTeal.withValues(alpha: 0.1)),
             borderRadius: BorderRadius.circular(10.r),
           ),
           child: Icon(
@@ -863,339 +1012,369 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     await showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28.r),
+        ),
         backgroundColor: Colors.transparent,
-        child: SingleChildScrollView(  // SCROLLABLE - NO OVERFLOW!
+        child: SingleChildScrollView(
+          // SCROLLABLE - NO OVERFLOW!
           child: Container(
-            padding: EdgeInsets.all(20.w),  // Reduced padding for smaller screens
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      Theme.of(context).dialogBackgroundColor,
-                      Colors.green.shade900.withValues(alpha: 0.3),
-                    ]
-                  : [
-                      Colors.white,
-                      Colors.green.shade50,
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(28.r),
-            border: Border.all(
-              color: isDark
-                  ? AppColors.primaryLime.withValues(alpha: 0.5)
-                  : AppColors.primaryLime.withValues(alpha: 0.3),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryLime.withValues(alpha: 0.2),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
+            padding: EdgeInsets.all(
+              20.w,
+            ), // Reduced padding for smaller screens
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Theme.of(context).dialogBackgroundColor,
+                        Colors.green.shade900.withValues(alpha: 0.3),
+                      ]
+                    : [Colors.white, Colors.green.shade50],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with Icon and Status
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Colors.green, AppColors.primaryLime],
-                      ),
-                      borderRadius: BorderRadius.circular(16.r),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primaryLime.withValues(alpha: 0.4),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.output_rounded,
-                      color: Colors.white,
-                      size: 32.sp,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Checkout Book',
-                          style: TextStyle(
-                            fontSize: 22.sp,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? AppColors.primaryLime : Colors.green.shade700,
-                          ),
-                        ),
-                        SizedBox(height: 4.h),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade600.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8.r),
-                            border: Border.all(
-                              color: Colors.green.shade600,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Text(
-                            'Available',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green.shade600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              borderRadius: BorderRadius.circular(28.r),
+              border: Border.all(
+                color: isDark
+                    ? AppColors.primaryLime.withValues(alpha: 0.5)
+                    : AppColors.primaryLime.withValues(alpha: 0.3),
+                width: 2,
               ),
-
-              SizedBox(height: 16.h),  // Reduced
-
-              // Book Details with Premium Styling
-              _buildPremiumInfoRow(
-                Icons.fingerprint_rounded,
-                'ID',
-                book.bookId,
-                isDark,
-              ),
-              SizedBox(height: 10.h),  // Reduced
-              _buildPremiumInfoRow(
-                Icons.title_rounded,
-                'Title',
-                book.title,
-                isDark,
-                isTitle: true,
-              ),
-              SizedBox(height: 10.h),  // Reduced
-              _buildPremiumInfoRow(
-                Icons.menu_book_rounded,
-                'Shelf',
-                book.shelf.isNotEmpty ? book.shelf : 'Not specified',
-                isDark,
-              ),
-              SizedBox(height: 10.h),  // Reduced
-              _buildPremiumInfoRow(
-                Icons.category_rounded,
-                'Category',
-                book.category.isNotEmpty ? book.category : 'Not specified',
-                isDark,
-              ),
-
-              SizedBox(height: 16.h),  // Reduced
-
-              // Borrower Name Input (INTEGRATED - NO SECOND DIALOG!)
-              TextField(
-                controller: nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Borrower Name *',
-                  hintText: 'Enter your full name',
-                  prefixIcon: Icon(
-                    Icons.person_rounded,
-                    color: AppColors.primaryTeal,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: isDark ? AppColors.primaryTeal : AppColors.primaryTeal.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: AppColors.primaryTeal,
-                      width: 2,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.black.withValues(alpha: 0.2)
-                      : Colors.grey.shade50,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryLime.withValues(alpha: 0.2),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
                 ),
-              ),
-
-              SizedBox(height: 18.h),  // Reduced from 28
-
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with Icon and Status
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(16.w),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.green, AppColors.primaryLime],
                         ),
-                        side: BorderSide(
-                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-                          width: 2,
-                        ),
+                        borderRadius: BorderRadius.circular(16.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryLime.withValues(alpha: 0.4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
+                      child: Icon(
+                        Icons.output_rounded,
+                        color: Colors.white,
+                        size: 32.sp,
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Checkout Book',
+                            style: TextStyle(
+                              fontSize: 22.sp,
+                              fontWeight: FontWeight.w800,
+                              color: isDark
+                                  ? AppColors.primaryLime
+                                  : Colors.green.shade700,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade600.withValues(
+                                alpha: 0.2,
+                              ),
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: Colors.green.shade600,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              'Available',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.green.shade600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 16.h), // Reduced
+                // Book Details with Premium Styling
+                _buildPremiumInfoRow(
+                  Icons.fingerprint_rounded,
+                  'ID',
+                  book.bookId,
+                  isDark,
+                ),
+                SizedBox(height: 10.h), // Reduced
+                _buildPremiumInfoRow(
+                  Icons.title_rounded,
+                  'Title',
+                  book.title,
+                  isDark,
+                  isTitle: true,
+                ),
+                SizedBox(height: 10.h), // Reduced
+                _buildPremiumInfoRow(
+                  Icons.menu_book_rounded,
+                  'Shelf',
+                  book.shelf.isNotEmpty ? book.shelf : 'Not specified',
+                  isDark,
+                ),
+                SizedBox(height: 10.h), // Reduced
+                _buildPremiumInfoRow(
+                  Icons.category_rounded,
+                  'Category',
+                  book.category.isNotEmpty ? book.category : 'Not specified',
+                  isDark,
+                ),
+
+                SizedBox(height: 16.h), // Reduced
+                // Borrower Name Input (INTEGRATED - NO SECOND DIALOG!)
+                TextField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Borrower Name *',
+                    hintText: 'Enter your full name',
+                    prefixIcon: Icon(
+                      Icons.person_rounded,
+                      color: AppColors.primaryTeal,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? AppColors.primaryTeal
+                            : AppColors.primaryTeal.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.grey.shade600
+                            : Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                      borderSide: BorderSide(
+                        color: AppColors.primaryTeal,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.black.withValues(alpha: 0.2)
+                        : Colors.grey.shade50,
+                  ),
+                ),
+
+                SizedBox(height: 18.h), // Reduced from 28
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                          ),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.grey.shade600
+                                : Colors.grey.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        // Get name from the TextField in THIS dialog (no second dialog!)
-                        final borrowerName = nameController.text.trim();
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          var loadingDialogVisible = false;
 
-                        print('DEBUG: Checkout button pressed, name: "$borrowerName"');
+                          // Get name from the TextField in THIS dialog (no second dialog!)
+                          final borrowerName = nameController.text.trim();
 
-                        // Validate name
-                        if (borrowerName.isEmpty) {
-                          print('DEBUG: Name is empty, showing error');
-                          showPremiumErrorDialog(
-                            context,
-                            title: 'Name Required',
-                            message: 'Please enter your name before checking out the book.',
-                            icon: Icons.person_off_rounded,
-                          );
-                          return;
-                        }
-
-                        // Close the checkout dialog
-                        Navigator.pop(context);
-
-                        if (!mounted) return;
-
-                        // CRITICAL: Get context from the widget state (THIS context works!)
-                        final widgetContext = this.context;
-
-                        // Show loading
-                        showPremiumLoadingDialog(widgetContext, message: 'Checking out book...');
-
-                        try {
-                          print('DEBUG: Starting checkout for book ${book.bookId} to $borrowerName');
-
-                          final success = await GoogleSheetsService.instance.checkoutBook(
-                            book.bookId,
-                            borrowerName,
+                          print(
+                            'DEBUG: Checkout button pressed, name: "$borrowerName"',
                           );
 
-                          print('DEBUG: Checkout result: $success');
-
-                          // Dismiss loading
-                          if (mounted) {
-                            Navigator.of(widgetContext).pop();
+                          // Validate name
+                          if (borrowerName.isEmpty) {
+                            print('DEBUG: Name is empty, showing error');
+                            showPremiumErrorDialog(
+                              context,
+                              title: 'Name Required',
+                              message:
+                                  'Please enter your name before checking out the book.',
+                              icon: Icons.person_off_rounded,
+                            );
+                            return;
                           }
+
+                          // Close the checkout dialog
+                          Navigator.pop(context);
 
                           if (!mounted) return;
 
-                          if (success) {
-                            // Success! Fulfilling vibration pattern
-                            print('DEBUG: Showing success dialog');
-                            if (await Vibration.hasVibrator() ?? false) {
-                              // Double vibration for success (fulfilling feeling)
-                              Vibration.vibrate(pattern: [0, 100, 100, 100]);
+                          // CRITICAL: Get context from the widget state (THIS context works!)
+                          final widgetContext = this.context;
+
+                          // Show loading
+                          showPremiumLoadingDialog(
+                            widgetContext,
+                            message: 'Checking out book...',
+                          );
+                          loadingDialogVisible = true;
+
+                          try {
+                            print(
+                              'DEBUG: Starting checkout for book ${book.bookId} to $borrowerName',
+                            );
+
+                            final success = await GoogleSheetsService.instance
+                                .checkoutBook(book.bookId, borrowerName);
+
+                            print('DEBUG: Checkout result: $success');
+
+                            // Dismiss loading
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
                             }
 
-                            await showPremiumSuccessDialog(
-                              widgetContext,
-                              title: 'Book Checked Out!',
-                              message: '${book.title} has been checked out to $borrowerName.\n\nDue back in 14 days.',
-                              icon: Icons.check_circle_rounded,
-                              onPrimaryPressed: () {
-                                Navigator.of(widgetContext).pop(); // Close success dialog ONLY (stay in scanner!)
-                              },
-                            );
-                          } else {
-                            // Failure vibration (error pattern)
-                            print('DEBUG: Checkout returned false');
-                            if (await Vibration.hasVibrator() ?? false) {
-                              // Triple short vibration for error
-                              Vibration.vibrate(pattern: [0, 50, 50, 50, 50, 50]);
+                            if (!mounted) return;
+
+                            if (success) {
+                              // Success! Fulfilling vibration pattern
+                              print('DEBUG: Showing success dialog');
+                              if (await Vibration.hasVibrator() ?? false) {
+                                // Double vibration for success (fulfilling feeling)
+                                Vibration.vibrate(pattern: [0, 100, 100, 100]);
+                              }
+
+                              await showPremiumSuccessDialog(
+                                widgetContext,
+                                title: 'Book Checked Out!',
+                                message:
+                                    '${book.title} has been checked out to $borrowerName.\n\nDue back in 14 days.',
+                                icon: Icons.check_circle_rounded,
+                              );
+                            } else {
+                              // Failure vibration (error pattern)
+                              print('DEBUG: Checkout returned false');
+                              if (await Vibration.hasVibrator() ?? false) {
+                                // Triple short vibration for error
+                                Vibration.vibrate(
+                                  pattern: [0, 50, 50, 50, 50, 50],
+                                );
+                              }
+
+                              await showPremiumErrorDialog(
+                                widgetContext,
+                                title: 'Checkout Failed',
+                                message:
+                                    'Failed to checkout the book. Please try again.',
+                                icon: Icons.error_rounded,
+                              );
                             }
+                          } catch (e, stackTrace) {
+                            print('DEBUG: Checkout error: $e');
+                            print('DEBUG: Stack trace: $stackTrace');
+
+                            // Dismiss loading if showing
+                            if (mounted &&
+                                loadingDialogVisible &&
+                                Navigator.of(widgetContext).canPop()) {
+                              Navigator.of(widgetContext).pop();
+                              loadingDialogVisible = false;
+                            }
+
+                            if (!mounted) return;
 
                             await showPremiumErrorDialog(
-                              context,
-                              title: 'Checkout Failed',
-                              message: 'Failed to checkout the book. Please try again.',
-                              icon: Icons.error_rounded,
+                              widgetContext,
+                              title: 'Error',
+                              message: 'An error occurred:\n${e.toString()}',
+                              icon: Icons.error_outline_rounded,
                             );
+                          } finally {
+                            // CRITICAL: Reset processing flag so scanner can work again
+                            print(
+                              'DEBUG: Resetting _isProcessing flag after checkout',
+                            );
+                            if (mounted) {
+                              setState(() => _isProcessing = false);
+                            }
                           }
-                        } catch (e, stackTrace) {
-                          print('DEBUG: Checkout error: $e');
-                          print('DEBUG: Stack trace: $stackTrace');
-
-                          // Dismiss loading if showing
-                          if (mounted && Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          }
-
-                          if (!mounted) return;
-
-                          await showPremiumErrorDialog(
-                            context,
-                            title: 'Error',
-                            message: 'An error occurred:\n${e.toString()}',
-                            icon: Icons.error_outline_rounded,
-                          );
-                        } finally {
-                          // CRITICAL: Reset processing flag so scanner can work again
-                          print('DEBUG: Resetting _isProcessing flag after checkout');
-                          if (mounted) {
-                            setState(() => _isProcessing = false);
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r),
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                          ),
+                          backgroundColor: Colors.green.shade600,
+                          elevation: 3,
                         ),
-                        backgroundColor: Colors.green.shade600,
-                        elevation: 3,
-                      ),
-                      child: Text(
-                        'Checkout',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                        child: Text(
+                          'Checkout',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),  // Close Container
+                  ],
+                ),
+              ],
+            ),
+          ), // Close Container
         ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0)),
-      ),  // Close SingleChildScrollView
+      ), // Close SingleChildScrollView
     );
   }
 
@@ -1211,177 +1390,219 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
         backgroundColor: Colors.transparent,
-        child: Container(
-          padding: EdgeInsets.all(28.w),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      Theme.of(context).dialogBackgroundColor,
-                      AppColors.primaryTeal.withValues(alpha: 0.2),
-                    ]
-                  : [
-                      Colors.white,
-                      AppColors.primaryTeal.withValues(alpha: 0.1),
+        child:
+            Container(
+                  padding: EdgeInsets.all(28.w),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [
+                              Theme.of(context).dialogBackgroundColor,
+                              AppColors.primaryTeal.withValues(alpha: 0.2),
+                            ]
+                          : [
+                              Colors.white,
+                              AppColors.primaryTeal.withValues(alpha: 0.1),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(24.r),
+                    border: Border.all(
+                      color: isDark
+                          ? AppColors.primaryTeal.withValues(alpha: 0.5)
+                          : AppColors.primaryTeal.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon
+                      Container(
+                        padding: EdgeInsets.all(16.w),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.primaryTeal,
+                              AppColors.primaryLime,
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 32.sp,
+                        ),
+                      ),
+
+                      SizedBox(height: 20.h),
+
+                      Text(
+                        'Enter Your Name',
+                        style: TextStyle(
+                          fontSize: 22.sp,
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.primaryDarkBlue,
+                        ),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      TextField(
+                        controller: controller,
+                        autofocus:
+                            false, // Disable autofocus to prevent keyboard glitch
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: 'Borrower Name *',
+                          hintText: 'Enter full name',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? AppColors.primaryTeal
+                                  : AppColors.primaryTeal.withValues(
+                                      alpha: 0.5,
+                                    ),
+                              width: 2,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? Colors.grey.shade600
+                                  : Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: BorderSide(
+                              color: AppColors.primaryTeal,
+                              width: 2,
+                            ),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.person_rounded,
+                            color: AppColors.primaryTeal,
+                          ),
+                          filled: true,
+                          fillColor: isDark
+                              ? Colors.black.withValues(alpha: 0.2)
+                              : Colors.grey.shade50,
+                        ),
+                        onSubmitted: (value) {
+                          print(
+                            'DEBUG: TextField submitted with value: "$value"',
+                          );
+                          if (value.trim().isNotEmpty) {
+                            print(
+                              'DEBUG: Calling Navigator.pop from onSubmitted',
+                            );
+                            Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).pop(value.trim());
+                          }
+                        },
+                      ),
+
+                      SizedBox(height: 28.h),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                print(
+                                  'DEBUG: Cancel button pressed in borrower dialog',
+                                );
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 14.h),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14.r),
+                                ),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? Colors.grey.shade600
+                                      : Colors.grey.shade400,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                print('DEBUG: Continue button pressed!');
+                                final name = controller.text.trim();
+                                print('DEBUG: Name entered: "$name"');
+                                if (name.isNotEmpty) {
+                                  print(
+                                    'DEBUG: Calling Navigator.pop with name',
+                                  );
+                                  Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  ).pop(name); // Use rootNavigator!
+                                } else {
+                                  print(
+                                    'DEBUG: Name is empty, not closing dialog',
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 14.h),
+                                backgroundColor: AppColors.primaryTeal,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14.r),
+                                ),
+                                elevation: 3,
+                              ),
+                              child: Text(
+                                'Continue',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-            ),
-            borderRadius: BorderRadius.circular(24.r),
-            border: Border.all(
-              color: isDark
-                  ? AppColors.primaryTeal.withValues(alpha: 0.5)
-                  : AppColors.primaryTeal.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon
-              Container(
-                padding: EdgeInsets.all(16.w),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryTeal, AppColors.primaryLime],
                   ),
-                  shape: BoxShape.circle,
+                )
+                .animate()
+                .fadeIn(duration: 250.ms)
+                .scale(
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.0, 1.0),
                 ),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
-                  size: 32.sp,
-                ),
-              ),
-
-              SizedBox(height: 20.h),
-
-              Text(
-                'Enter Your Name',
-                style: TextStyle(
-                  fontSize: 22.sp,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : AppColors.primaryDarkBlue,
-                ),
-              ),
-
-              SizedBox(height: 24.h),
-
-              TextField(
-                controller: controller,
-                autofocus: false, // Disable autofocus to prevent keyboard glitch
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Borrower Name *',
-                  hintText: 'Enter full name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: isDark ? AppColors.primaryTeal : AppColors.primaryTeal.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                    borderSide: BorderSide(
-                      color: AppColors.primaryTeal,
-                      width: 2,
-                    ),
-                  ),
-                  prefixIcon: Icon(
-                    Icons.person_rounded,
-                    color: AppColors.primaryTeal,
-                  ),
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.black.withValues(alpha: 0.2)
-                      : Colors.grey.shade50,
-                ),
-                onSubmitted: (value) {
-                  print('DEBUG: TextField submitted with value: "$value"');
-                  if (value.trim().isNotEmpty) {
-                    print('DEBUG: Calling Navigator.pop from onSubmitted');
-                    Navigator.of(context, rootNavigator: true).pop(value.trim());
-                  }
-                },
-              ),
-
-              SizedBox(height: 28.h),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        print('DEBUG: Cancel button pressed in borrower dialog');
-                        Navigator.of(context, rootNavigator: true).pop();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 14.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r),
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-                          width: 2,
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        print('DEBUG: Continue button pressed!');
-                        final name = controller.text.trim();
-                        print('DEBUG: Name entered: "$name"');
-                        if (name.isNotEmpty) {
-                          print('DEBUG: Calling Navigator.pop with name');
-                          Navigator.of(context, rootNavigator: true).pop(name);  // Use rootNavigator!
-                        } else {
-                          print('DEBUG: Name is empty, not closing dialog');
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 14.h),
-                        backgroundColor: AppColors.primaryTeal,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r),
-                        ),
-                        elevation: 3,
-                      ),
-                      child: Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ).animate().fadeIn(duration: 250.ms).scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0)),
       ),
     );
 
@@ -1397,7 +1618,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     await showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28.r),
+        ),
         backgroundColor: Colors.transparent,
         child: Container(
           padding: EdgeInsets.all(28.w),
@@ -1420,13 +1643,17 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             borderRadius: BorderRadius.circular(28.r),
             border: Border.all(
               color: isOverdue
-                  ? (isDark ? Colors.red.shade600 : Colors.red.shade400).withValues(alpha: 0.5)
-                  : (isDark ? Colors.blue.shade600 : Colors.blue.shade400).withValues(alpha: 0.5),
+                  ? (isDark ? Colors.red.shade600 : Colors.red.shade400)
+                        .withValues(alpha: 0.5)
+                  : (isDark ? Colors.blue.shade600 : Colors.blue.shade400)
+                        .withValues(alpha: 0.5),
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isOverdue ? Colors.red : Colors.blue).withValues(alpha: 0.2),
+                color: (isOverdue ? Colors.red : Colors.blue).withValues(
+                  alpha: 0.2,
+                ),
                 blurRadius: 30,
                 offset: const Offset(0, 10),
               ),
@@ -1450,14 +1677,17 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                       borderRadius: BorderRadius.circular(16.r),
                       boxShadow: [
                         BoxShadow(
-                          color: (isOverdue ? Colors.red : Colors.blue).withValues(alpha: 0.4),
+                          color: (isOverdue ? Colors.red : Colors.blue)
+                              .withValues(alpha: 0.4),
                           blurRadius: 15,
                           offset: const Offset(0, 5),
                         ),
                       ],
                     ),
                     child: Icon(
-                      isOverdue ? Icons.warning_rounded : Icons.keyboard_return_rounded,
+                      isOverdue
+                          ? Icons.warning_rounded
+                          : Icons.keyboard_return_rounded,
                       color: Colors.white,
                       size: 32.sp,
                     ),
@@ -1473,18 +1703,31 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                             fontSize: 22.sp,
                             fontWeight: FontWeight.w800,
                             color: isOverdue
-                                ? (isDark ? Colors.red.shade400 : Colors.red.shade700)
-                                : (isDark ? Colors.blue.shade400 : Colors.blue.shade700),
+                                ? (isDark
+                                      ? Colors.red.shade400
+                                      : Colors.red.shade700)
+                                : (isDark
+                                      ? Colors.blue.shade400
+                                      : Colors.blue.shade700),
                           ),
                         ),
                         SizedBox(height: 4.h),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 4.h,
+                          ),
                           decoration: BoxDecoration(
-                            color: (isOverdue ? Colors.red.shade600 : Colors.orange.shade600).withValues(alpha: 0.2),
+                            color:
+                                (isOverdue
+                                        ? Colors.red.shade600
+                                        : Colors.orange.shade600)
+                                    .withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(
-                              color: isOverdue ? Colors.red.shade600 : Colors.orange.shade600,
+                              color: isOverdue
+                                  ? Colors.red.shade600
+                                  : Colors.orange.shade600,
                               width: 1.5,
                             ),
                           ),
@@ -1493,7 +1736,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                             style: TextStyle(
                               fontSize: 12.sp,
                               fontWeight: FontWeight.w700,
-                              color: isOverdue ? Colors.red.shade600 : Colors.orange.shade600,
+                              color: isOverdue
+                                  ? Colors.red.shade600
+                                  : Colors.orange.shade600,
                             ),
                           ),
                         ),
@@ -1545,7 +1790,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               _buildPremiumInfoRow(
                 Icons.calendar_today_rounded,
                 'Checkout Date',
-                book.checkoutDate != null ? _formatDate(book.checkoutDate!) : 'N/A',
+                book.checkoutDate != null
+                    ? _formatDate(book.checkoutDate!)
+                    : 'N/A',
                 isDark,
               ),
               SizedBox(height: 14.h),
@@ -1571,7 +1818,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                           borderRadius: BorderRadius.circular(14.r),
                         ),
                         side: BorderSide(
-                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                          color: isDark
+                              ? Colors.grey.shade600
+                              : Colors.grey.shade400,
                           width: 2,
                         ),
                       ),
@@ -1589,6 +1838,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     flex: 2,
                     child: ElevatedButton(
                       onPressed: () async {
+                        var loadingDialogVisible = false;
+
                         // Close the return dialog
                         Navigator.pop(context);
 
@@ -1598,14 +1849,22 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                         final widgetContext = this.context;
 
                         // Show loading
-                        showPremiumLoadingDialog(widgetContext, message: 'Returning book...');
+                        showPremiumLoadingDialog(
+                          widgetContext,
+                          message: 'Returning book...',
+                        );
+                        loadingDialogVisible = true;
 
                         try {
-                          final success = await GoogleSheetsService.instance.returnBook(book.bookId);
+                          final success = await GoogleSheetsService.instance
+                              .returnBook(book.bookId);
 
                           // Dismiss loading
-                          if (mounted) {
+                          if (mounted &&
+                              loadingDialogVisible &&
+                              Navigator.of(widgetContext).canPop()) {
                             Navigator.of(widgetContext).pop();
+                            loadingDialogVisible = false;
                           }
 
                           if (!mounted) return;
@@ -1620,43 +1879,49 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                             await showPremiumSuccessDialog(
                               widgetContext,
                               title: 'Book Returned!',
-                              message: '${book.title} has been successfully returned.\n\nThank you for using the library!',
+                              message:
+                                  '${book.title} has been successfully returned.\n\nThank you for using the library!',
                               icon: Icons.check_circle_rounded,
-                              onPrimaryPressed: () {
-                                Navigator.of(widgetContext).pop(); // Close success dialog ONLY (stay in scanner!)
-                              },
                             );
                           } else {
                             // Failure vibration
                             if (await Vibration.hasVibrator() ?? false) {
                               // Triple short vibration for error
-                              Vibration.vibrate(pattern: [0, 50, 50, 50, 50, 50]);
+                              Vibration.vibrate(
+                                pattern: [0, 50, 50, 50, 50, 50],
+                              );
                             }
 
                             await showPremiumErrorDialog(
-                              context,
+                              widgetContext,
                               title: 'Return Failed',
-                              message: 'Failed to return the book. Please try again or contact the administrator.',
+                              message:
+                                  'Failed to return the book. Please try again or contact the administrator.',
                               icon: Icons.error_rounded,
                             );
                           }
                         } catch (e) {
                           // Dismiss loading if showing
-                          if (mounted && Navigator.canPop(context)) {
-                            Navigator.pop(context);
+                          if (mounted &&
+                              loadingDialogVisible &&
+                              Navigator.of(widgetContext).canPop()) {
+                            Navigator.of(widgetContext).pop();
+                            loadingDialogVisible = false;
                           }
 
                           if (!mounted) return;
 
                           await showPremiumErrorDialog(
-                            context,
+                            widgetContext,
                             title: 'Error',
                             message: 'An error occurred:\n${e.toString()}',
                             icon: Icons.error_outline_rounded,
                           );
                         } finally {
                           // CRITICAL: Reset processing flag so scanner can work again
-                          print('DEBUG: Resetting _isProcessing flag after return');
+                          print(
+                            'DEBUG: Resetting _isProcessing flag after return',
+                          );
                           if (mounted) {
                             setState(() => _isProcessing = false);
                           }
@@ -1667,7 +1932,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14.r),
                         ),
-                        backgroundColor: isOverdue ? Colors.red.shade600 : Colors.blue.shade600,
+                        backgroundColor: isOverdue
+                            ? Colors.red.shade600
+                            : Colors.blue.shade600,
                         elevation: 3,
                       ),
                       child: Text(
@@ -1689,7 +1956,6 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     );
   }
 
-
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.only(bottom: 8.h),
@@ -1698,7 +1964,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         children: [
           SizedBox(
             width: 100.w,
-            child: Text('$label:', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
           Expanded(child: Text(value)),
         ],
@@ -1747,20 +2016,52 @@ class ScannerOverlayPainter extends CustomPainter {
       ..strokeWidth = 6;
 
     // Top-left
-    canvas.drawLine(Offset(left, top), Offset(left + cornerLength, top), cornerPaint);
-    canvas.drawLine(Offset(left, top), Offset(left, top + cornerLength), cornerPaint);
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left + cornerLength, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left, top + cornerLength),
+      cornerPaint,
+    );
 
     // Top-right
-    canvas.drawLine(Offset(left + frameSize - cornerLength, top), Offset(left + frameSize, top), cornerPaint);
-    canvas.drawLine(Offset(left + frameSize, top), Offset(left + frameSize, top + cornerLength), cornerPaint);
+    canvas.drawLine(
+      Offset(left + frameSize - cornerLength, top),
+      Offset(left + frameSize, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left + frameSize, top),
+      Offset(left + frameSize, top + cornerLength),
+      cornerPaint,
+    );
 
     // Bottom-left
-    canvas.drawLine(Offset(left, top + frameSize - cornerLength), Offset(left, top + frameSize), cornerPaint);
-    canvas.drawLine(Offset(left, top + frameSize), Offset(left + cornerLength, top + frameSize), cornerPaint);
+    canvas.drawLine(
+      Offset(left, top + frameSize - cornerLength),
+      Offset(left, top + frameSize),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, top + frameSize),
+      Offset(left + cornerLength, top + frameSize),
+      cornerPaint,
+    );
 
     // Bottom-right
-    canvas.drawLine(Offset(left + frameSize, top + frameSize - cornerLength), Offset(left + frameSize, top + frameSize), cornerPaint);
-    canvas.drawLine(Offset(left + frameSize - cornerLength, top + frameSize), Offset(left + frameSize, top + frameSize), cornerPaint);
+    canvas.drawLine(
+      Offset(left + frameSize, top + frameSize - cornerLength),
+      Offset(left + frameSize, top + frameSize),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left + frameSize - cornerLength, top + frameSize),
+      Offset(left + frameSize, top + frameSize),
+      cornerPaint,
+    );
   }
 
   @override

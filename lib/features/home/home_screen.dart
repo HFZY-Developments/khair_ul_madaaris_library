@@ -5,9 +5,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/utils/responsive.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/debounced_button.dart';
+import '../../core/widgets/ambient_motion_background.dart';
 import '../../core/widgets/premium_dialogs.dart';
 import '../../core/widgets/network_indicator.dart';
 import '../../models/book.dart';
@@ -27,7 +27,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -36,7 +37,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     super.initState();
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 6000), // Slower overall - 6 seconds per cycle
+      duration: const Duration(
+        milliseconds: 6000,
+      ), // Slower overall - 6 seconds per cycle
     )..repeat();
 
     _fadeAnimation = TweenSequence<double>([
@@ -47,7 +50,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       ),
       // Gentle fade to "Library" - Much slower transition
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeInOutCubic)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeInOutCubic)),
         weight: 15, // Slow fade for 0.9s
       ),
       // Show "Library" - Hold longer
@@ -57,7 +63,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       ),
       // Gentle fade back to "Khair-ul-Madaaris" - Much slower transition
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.easeInOutCubic)),
+        tween: Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeInOutCubic)),
         weight: 15, // Slow fade for 0.9s
       ),
     ]).animate(_fadeController);
@@ -79,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(adminModeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final connectionStatus = ref.watch(sheetsConnectionProvider);
     final isConnected = connectionStatus.maybeWhen(
       data: (connected) => connected,
@@ -92,7 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           final screenWidth = MediaQuery.of(context).size.width;
           const double refWidth = 428.0;
           final double scale = (screenWidth / refWidth).clamp(0.75, 2.5);
-          return (56.0 * scale).clamp(56.0, 80.0);  // Scale toolbar height
+          return (56.0 * scale).clamp(56.0, 80.0); // Scale toolbar height
         }(),
         title: LayoutBuilder(
           builder: (context, constraints) {
@@ -115,7 +125,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   SizedBox(height: 2.0),
                   Text(
                     AppConstants.appNameArabic,
-                    style: TextStyle(fontSize: arabicFontSize, fontWeight: FontWeight.w400),
+                    style: TextStyle(
+                      fontSize: arabicFontSize,
+                      fontWeight: FontWeight.w400,
+                    ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -135,25 +148,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             // Theme toggle
             IconButton(
               iconSize: iconSize,
-              icon: Icon(Theme.of(context).brightness == Brightness.light
-                  ? Icons.dark_mode_rounded
-                  : Icons.light_mode_rounded),
+              icon: Icon(
+                Theme.of(context).brightness == Brightness.light
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+              ),
               onPressed: () {
                 HapticFeedback.mediumImpact();
                 ref.read(themeModeProvider.notifier).toggleTheme(context);
               },
             ),
-            // Donation button with attention-grabbing shake animation
+            // Donation button with subtle premium motion
             IconButton(
               iconSize: iconSize,
               icon: Icon(Icons.favorite_rounded, color: Colors.red[400])
-                  .animate(onPlay: (controller) => controller.repeat())
-                  .shake(
-                    duration: 1500.ms,
-                    hz: 3,
-                    curve: Curves.easeInOut,
+                  .animate(
+                    onPlay: (controller) => controller.repeat(reverse: true),
                   )
-                  .then(delay: 2000.ms), // Pause between shake cycles
+                  .scale(
+                    begin: const Offset(1.0, 1.0),
+                    end: const Offset(1.06, 1.06),
+                    duration: 2600.ms,
+                    curve: Curves.easeInOut,
+                  ),
               onPressed: () {
                 HapticFeedback.mediumImpact();
                 Navigator.push(
@@ -165,7 +182,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             // Admin mode toggle
             IconButton(
               iconSize: iconSize,
-              icon: Icon(isAdmin ? Icons.admin_panel_settings : Icons.lock_outline),
+              icon: Icon(
+                isAdmin ? Icons.admin_panel_settings : Icons.lock_outline,
+              ),
               color: isAdmin ? AppColors.primaryLime : null,
               onPressed: () => _toggleAdminMode(context),
             ),
@@ -189,236 +208,387 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
           // Main content
           Expanded(
-            child: SafeArea(
-              top: false, // NetworkIndicator handles top safe area
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // FLUID SCALE FACTOR for ALL body dimensions
-                  final screenWidth = constraints.maxWidth;
-                  final screenHeight = MediaQuery.of(context).size.height;
-                  const double refWidth = 428.0;
-                  final double scale = (screenWidth / refWidth).clamp(0.75, 2.5);
-
-                  // All dimensions now use fluid scaling!
-                  final horizontalPadding = (24.0 * scale).clamp(16.0, 36.0);
-                  final verticalSpacing = (24.0 * scale).clamp(16.0, 32.0);
-                  final logoSpacing = (32.0 * scale).clamp(24.0, 44.0);
-
-                  return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: (16.0 * scale).clamp(12.0, 24.0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [
+                          AppColors.primaryDarkBlue.withValues(alpha: 0.08),
+                          Colors.transparent,
+                          AppColors.primaryTeal.withValues(alpha: 0.06),
+                        ]
+                      : [
+                          AppColors.primaryTeal.withValues(alpha: 0.04),
+                          Colors.transparent,
+                          AppColors.primaryLime.withValues(alpha: 0.05),
+                        ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Stack(
                 children: [
-                  // Connection Status
-                  connectionStatus.when(
-                    data: (connected) => _buildConnectionBanner(connected),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
-
-                  SizedBox(height: verticalSpacing),
-
-                  // Actual Logo - Fluid responsive scaling
-                  Center(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        // FLUID SCALE FACTOR (same as button)
-                        const double referenceWidth = 428.0;
-                        final double scaleWidth = screenWidth / referenceWidth;
-                        final double scaleHeight = screenHeight / 926.0;
-                        final double scaleFactor = (scaleWidth < scaleHeight ? scaleWidth : scaleHeight).clamp(0.75, 2.5);
-
-                        // Base dimensions from Xiaomi 12S Ultra design
-                        final logoSize = (170.0 * scaleFactor).clamp(110.0, 320.0);
-                        final logoPadding = 22.0 * scaleFactor;
-                        final glowBlur = 50.0 * scaleFactor;
-                        final glowSpread = 10.0 * scaleFactor;
-                        final borderRad = 35.0 * scaleFactor;
-
-                        return Container(
-                          width: logoSize,
-                          height: logoSize,
-                          padding: EdgeInsets.all(logoPadding),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(borderRad),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryTeal.withValues(alpha: 0.25),
-                                blurRadius: glowBlur,
-                                spreadRadius: glowSpread,
-                                offset: const Offset(0, 12),
-                              ),
-                              BoxShadow(
-                                color: AppColors.primaryLime.withValues(alpha: 0.2),
-                                blurRadius: glowBlur + 20,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 0),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ).animate().scale(curve: Curves.elasticOut, duration: 800.ms);
-                      },
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AmbientMotionBackground(
+                        isDark: isDark,
+                        alphaScale: 0.6,
+                      ),
                     ),
                   ),
-
-                  SizedBox(height: logoSpacing),
-
-                  // Mode indicator (No emojis - Professional icons)
-                  Center(
+                  SafeArea(
+                    top: false, // NetworkIndicator handles top safe area
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        // Use same fluid scale factor
+                        // FLUID SCALE FACTOR for ALL body dimensions
+                        final screenWidth = constraints.maxWidth;
+                        final screenHeight = MediaQuery.of(context).size.height;
                         const double refWidth = 428.0;
-                        final double scale = (screenWidth / refWidth).clamp(0.75, 2.5);
-
-                        // Base dimensions from Xiaomi 12S Ultra design
-                        final buttonPadding = EdgeInsets.symmetric(
-                          horizontal: (24.0 * scale).clamp(16.0, 40.0),
-                          vertical: (12.0 * scale).clamp(8.0, 18.0),
+                        final double scale = (screenWidth / refWidth).clamp(
+                          0.75,
+                          2.5,
                         );
-                        final iconSize = (20.0 * scale).clamp(16.0, 28.0);
-                        final fontSize = (18.0 * scale).clamp(14.0, 26.0);
-                        final spacing = (10.0 * scale).clamp(6.0, 16.0);
-                        final borderRadius = (24.0 * scale).clamp(18.0, 36.0);
-                        final shadowBlur = (14.0 * scale).clamp(10.0, 22.0);
 
-                        return Container(
-                          padding: buttonPadding,
-                          decoration: BoxDecoration(
-                            gradient: isAdmin ? AppColors.limeGradient : AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(borderRadius),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isAdmin ? AppColors.primaryLime : AppColors.primaryTeal).withValues(alpha: 0.3),
-                                blurRadius: shadowBlur,
-                                offset: Offset(0, (5.0 * scale).clamp(4.0, 8.0)),
-                              ),
-                            ],
+                        // All dimensions now use fluid scaling!
+                        final horizontalPadding = (24.0 * scale).clamp(
+                          16.0,
+                          36.0,
+                        );
+                        final verticalSpacing = (24.0 * scale).clamp(
+                          16.0,
+                          32.0,
+                        );
+                        final logoSpacing = (32.0 * scale).clamp(24.0, 44.0);
+
+                        return SingleChildScrollView(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding,
+                            vertical: (16.0 * scale).clamp(12.0, 24.0),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Icon(
-                                isAdmin ? Icons.shield_rounded : Icons.person_rounded,
-                                color: isAdmin ? AppColors.primaryDarkBlue : Colors.white,
-                                size: iconSize,
+                              // Connection Status
+                              connectionStatus.when(
+                                data: (connected) =>
+                                    _buildConnectionBanner(connected),
+                                loading: () => const SizedBox.shrink(),
+                                error: (_, __) => const SizedBox.shrink(),
                               ),
-                              SizedBox(width: spacing),
-                              Text(
-                                isAdmin ? 'Admin Mode' : 'User Mode',
-                                style: TextStyle(
-                                  color: isAdmin ? AppColors.primaryDarkBlue : Colors.white,
-                                  fontSize: fontSize,
-                                  fontWeight: FontWeight.w700,
+
+                              SizedBox(height: verticalSpacing),
+
+                              // Actual Logo - Fluid responsive scaling
+                              Center(
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    // FLUID SCALE FACTOR (same as button)
+                                    const double referenceWidth = 428.0;
+                                    final double scaleWidth =
+                                        screenWidth / referenceWidth;
+                                    final double scaleHeight =
+                                        screenHeight / 926.0;
+                                    final double scaleFactor =
+                                        (scaleWidth < scaleHeight
+                                                ? scaleWidth
+                                                : scaleHeight)
+                                            .clamp(0.75, 2.5);
+
+                                    // Base dimensions from Xiaomi 12S Ultra design
+                                    final logoSize = (170.0 * scaleFactor)
+                                        .clamp(110.0, 320.0);
+                                    final logoPadding = 22.0 * scaleFactor;
+                                    final glowBlur = 50.0 * scaleFactor;
+                                    final glowSpread = 10.0 * scaleFactor;
+                                    final borderRad = 35.0 * scaleFactor;
+
+                                    return Container(
+                                      width: logoSize,
+                                      height: logoSize,
+                                      padding: EdgeInsets.all(logoPadding),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                          borderRad,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primaryTeal
+                                                .withValues(alpha: 0.25),
+                                            blurRadius: glowBlur,
+                                            spreadRadius: glowSpread,
+                                            offset: const Offset(0, 12),
+                                          ),
+                                          BoxShadow(
+                                            color: AppColors.primaryLime
+                                                .withValues(alpha: 0.2),
+                                            blurRadius: glowBlur + 20,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, 0),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Image.asset(
+                                        'assets/images/logo.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ).animate().scale(
+                                      curve: Curves.elasticOut,
+                                      duration: 800.ms,
+                                    );
+                                  },
                                 ),
                               ),
+
+                              SizedBox(height: logoSpacing),
+
+                              // Mode indicator (No emojis - Professional icons)
+                              Center(
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    // Use same fluid scale factor
+                                    const double refWidth = 428.0;
+                                    final double scale =
+                                        (screenWidth / refWidth).clamp(
+                                          0.75,
+                                          2.5,
+                                        );
+
+                                    // Base dimensions from Xiaomi 12S Ultra design
+                                    final buttonPadding = EdgeInsets.symmetric(
+                                      horizontal: (24.0 * scale).clamp(
+                                        16.0,
+                                        40.0,
+                                      ),
+                                      vertical: (12.0 * scale).clamp(8.0, 18.0),
+                                    );
+                                    final iconSize = (20.0 * scale).clamp(
+                                      16.0,
+                                      28.0,
+                                    );
+                                    final fontSize = (18.0 * scale).clamp(
+                                      14.0,
+                                      26.0,
+                                    );
+                                    final spacing = (10.0 * scale).clamp(
+                                      6.0,
+                                      16.0,
+                                    );
+                                    final borderRadius = (24.0 * scale).clamp(
+                                      18.0,
+                                      36.0,
+                                    );
+                                    final shadowBlur = (14.0 * scale).clamp(
+                                      10.0,
+                                      22.0,
+                                    );
+
+                                    return Container(
+                                          padding: buttonPadding,
+                                          decoration: BoxDecoration(
+                                            gradient: isAdmin
+                                                ? AppColors.limeGradient
+                                                : AppColors.primaryGradient,
+                                            borderRadius: BorderRadius.circular(
+                                              borderRadius,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color:
+                                                    (isAdmin
+                                                            ? AppColors
+                                                                  .primaryLime
+                                                            : AppColors
+                                                                  .primaryTeal)
+                                                        .withValues(alpha: 0.3),
+                                                blurRadius: shadowBlur,
+                                                offset: Offset(
+                                                  0,
+                                                  (5.0 * scale).clamp(4.0, 8.0),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isAdmin
+                                                    ? Icons.shield_rounded
+                                                    : Icons.person_rounded,
+                                                color: isAdmin
+                                                    ? AppColors.primaryDarkBlue
+                                                    : Colors.white,
+                                                size: iconSize,
+                                              ),
+                                              SizedBox(width: spacing),
+                                              Text(
+                                                isAdmin
+                                                    ? 'Admin Mode'
+                                                    : 'User Mode',
+                                                style: TextStyle(
+                                                  color: isAdmin
+                                                      ? AppColors
+                                                            .primaryDarkBlue
+                                                      : Colors.white,
+                                                  fontSize: fontSize,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                        .animate()
+                                        .fadeIn(duration: 300.ms)
+                                        .scale(
+                                          curve: Curves.elasticOut,
+                                          duration: 600.ms,
+                                        );
+                                  },
+                                ),
+                              ),
+
+                              SizedBox(
+                                height: screenHeight < 700 ? 32.h : 40.h,
+                              ),
+
+                              // UNIFIED SMART SCANNER BUTTON (Replaces 3 redundant buttons)
+                              // Stream now emits initial value immediately, so no loading state
+                              connectionStatus.when(
+                                data: (connected) => _buildSmartScannerButton(
+                                  isAdmin,
+                                  connected,
+                                ),
+                                loading: () => _buildSmartScannerButton(
+                                  isAdmin,
+                                  false,
+                                ), // Should never happen now
+                                error: (_, __) =>
+                                    _buildSmartScannerButton(isAdmin, false),
+                              ),
+
+                              SizedBox(height: verticalSpacing),
+
+                              // Admin Dashboard Button (Admin Mode Only)
+                              if (isAdmin) ...[
+                                DebouncedOutlinedButton(
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const AdminDashboardScreen(),
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: AppColors.primaryLime,
+                                          width: 2,
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 20.h,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16.r,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.dashboard_rounded,
+                                            color: AppColors.primaryLime,
+                                            size: 24.sp,
+                                          ),
+                                          SizedBox(width: 12.w),
+                                          Text(
+                                            'Admin Dashboard',
+                                            style: TextStyle(
+                                              fontSize: 18.sp,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primaryLime,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 400.ms)
+                                    .slideY(begin: 0.2, end: 0),
+                                SizedBox(height: verticalSpacing),
+                              ] else ...[
+                                DebouncedOutlinedButton(
+                                      onPressed: () async {
+                                        if (!isConnected) {
+                                          await showPremiumErrorDialog(
+                                            context,
+                                            title: 'Sign In Required',
+                                            message:
+                                                'Please sign in with Google to search the library.',
+                                            icon: Icons.lock_rounded,
+                                          );
+                                          return;
+                                        }
+
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const KitaabSearchScreen(),
+                                          ),
+                                        );
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: AppColors.primaryTeal,
+                                          width: 2,
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 20.h,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16.r,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.search_rounded,
+                                            color: AppColors.primaryTeal,
+                                            size: 24.sp,
+                                          ),
+                                          SizedBox(width: 12.w),
+                                          Text(
+                                            'Kitaab Search',
+                                            style: TextStyle(
+                                              fontSize: 18.sp,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primaryTeal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                    .animate()
+                                    .fadeIn(delay: 400.ms)
+                                    .slideY(begin: 0.2, end: 0),
+                                SizedBox(height: verticalSpacing),
+                              ],
                             ],
                           ),
-                        ).animate().fadeIn(duration: 300.ms).scale(curve: Curves.elasticOut, duration: 600.ms);
+                        );
                       },
                     ),
                   ),
-
-                  SizedBox(height: screenHeight < 700 ? 32.h : 40.h),
-
-                  // UNIFIED SMART SCANNER BUTTON (Replaces 3 redundant buttons)
-                  // Stream now emits initial value immediately, so no loading state
-                  connectionStatus.when(
-                    data: (connected) => _buildSmartScannerButton(isAdmin, connected),
-                    loading: () => _buildSmartScannerButton(isAdmin, false), // Should never happen now
-                    error: (_, __) => _buildSmartScannerButton(isAdmin, false),
-                  ),
-
-                  SizedBox(height: verticalSpacing),
-
-                  // Admin Dashboard Button (Admin Mode Only)
-                  if (isAdmin) ...[
-                    DebouncedOutlinedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppColors.primaryLime, width: 2),
-                        padding: EdgeInsets.symmetric(vertical: 20.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.dashboard_rounded, color: AppColors.primaryLime, size: 24.sp),
-                          SizedBox(width: 12.w),
-                          Text(
-                            'Admin Dashboard',
-                            style: TextStyle(
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryLime,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2, end: 0),
-                    SizedBox(height: verticalSpacing),
-                  ] else ...[
-                    DebouncedOutlinedButton(
-                      onPressed: () async {
-                        if (!isConnected) {
-                          await showPremiumErrorDialog(
-                            context,
-                            title: 'Sign In Required',
-                            message: 'Please sign in with Google to search the library.',
-                            icon: Icons.lock_rounded,
-                          );
-                          return;
-                        }
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const KitaabSearchScreen()),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppColors.primaryTeal, width: 2),
-                        padding: EdgeInsets.symmetric(vertical: 20.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_rounded, color: AppColors.primaryTeal, size: 24.sp),
-                          SizedBox(width: 12.w),
-                          Text(
-                            'Kitaab Search',
-                            style: TextStyle(
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryTeal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2, end: 0),
-                    SizedBox(height: verticalSpacing),
-                  ],
                 ],
               ),
-            );
-          },
-        ),
-              ),
             ),
+          ),
         ],
       ),
     );
@@ -493,7 +663,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final double scaleHeight = screenHeight / referenceHeight;
 
     // Use the SMALLER scale factor to maintain proportions and prevent overflow
-    final double scaleFactor = scaleWidth < scaleHeight ? scaleWidth : scaleHeight;
+    final double scaleFactor = scaleWidth < scaleHeight
+        ? scaleWidth
+        : scaleHeight;
 
     // Clamp scale factor to reasonable limits (0.75x to 2.5x)
     final double clampedScale = scaleFactor.clamp(0.75, 2.5);
@@ -502,8 +674,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     // All dimensions scale proportionally with screen size!
 
     // CRITICAL: Use percentage of screen height for container to prevent overflow on tall screens
-    final containerHeightPercentage = screenHeight * 0.24;  // 24% of screen height
-    final containerHeight = containerHeightPercentage.clamp(140.0, 280.0);  // But limit extremes
+    final containerHeightPercentage =
+        screenHeight * 0.24; // 24% of screen height
+    final containerHeight = containerHeightPercentage.clamp(
+      140.0,
+      280.0,
+    ); // But limit extremes
 
     final containerPadding = (28.0 * clampedScale).clamp(16.0, 40.0);
     final iconPadding = (18.0 * clampedScale).clamp(12.0, 26.0);
@@ -527,7 +703,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           await showPremiumErrorDialog(
             context,
             title: 'Sign In Required',
-            message: 'Please sign in with Google to access the scanner.\n\nThis ensures all book transactions are properly tracked.',
+            message:
+                'Please sign in with Google to access the scanner.\n\nThis ensures all book transactions are properly tracked.',
             icon: Icons.lock_rounded,
           );
           return;
@@ -536,151 +713,175 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         print('DEBUG SCAN: Connected, opening scanner');
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => QRScannerScreen(isAdmin: isAdmin),
-          ),
+          MaterialPageRoute(builder: (_) => QRScannerScreen(isAdmin: isAdmin)),
         );
       },
-      child: Container(
-        height: containerHeight,
-        constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.35,  // Allow up to 35% on larger screens
-          minHeight: 140,  // Minimum height to remain usable
-        ),
-        padding: EdgeInsets.all(containerPadding),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isAdmin
-                ? [AppColors.primaryLime, AppColors.primaryTeal]
-                : [AppColors.primaryTeal, AppColors.primaryDarkBlue],
-          ),
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: (isAdmin ? AppColors.primaryLime : AppColors.primaryTeal).withValues(alpha: 0.5),
-              blurRadius: (35.0 * clampedScale).clamp(20.0, 50.0),
-              spreadRadius: 0,
-              offset: Offset(0, (12.0 * clampedScale).clamp(8.0, 18.0)),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Top Row: QR Icon + Arrow
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Animated QR Code Icon
-                Container(
-                  padding: EdgeInsets.all(iconPadding),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular((20.0 * clampedScale).clamp(14.0, 28.0)),
-                  ),
-                  child: Icon(
-                    Icons.qr_code_scanner_rounded,
-                    size: iconSize,
-                    color: Colors.white,
-                  ),
-                )
-                    .animate(onPlay: (controller) => controller.repeat())
-                    .scale(
-                      begin: const Offset(1.0, 1.0),
-                      end: const Offset(1.05, 1.05),
-                      duration: 1500.ms,
-                      curve: Curves.easeInOut,
-                    )
-                    .then()
-                    .scale(
-                      begin: const Offset(1.05, 1.05),
-                      end: const Offset(1.0, 1.0),
-                      duration: 1500.ms,
-                      curve: Curves.easeInOut,
-                    ),
-
-                // Arrow indicator
-                Container(
-                  padding: EdgeInsets.all(arrowPadding),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: arrowSize,
-                  ),
+      child:
+          Container(
+                height: containerHeight,
+                constraints: BoxConstraints(
+                  maxHeight:
+                      screenHeight * 0.35, // Allow up to 35% on larger screens
+                  minHeight: 140, // Minimum height to remain usable
                 ),
-              ],
-            ),
-
-            // Bottom Section: Title + Subtitle (Constrained with FittedBox)
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: screenWidth * 0.85),
-                      child: Text(
-                        'TAP TO SCAN',
-                        style: TextStyle(
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: (1.5 * clampedScale).clamp(0.8, 2.0),
-                          height: 1.0,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                padding: EdgeInsets.all(containerPadding),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isAdmin
+                        ? [AppColors.primaryLime, AppColors.primaryTeal]
+                        : [AppColors.primaryTeal, AppColors.primaryDarkBlue],
+                  ),
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          (isAdmin
+                                  ? AppColors.primaryLime
+                                  : AppColors.primaryTeal)
+                              .withValues(alpha: 0.5),
+                      blurRadius: (35.0 * clampedScale).clamp(20.0, 50.0),
+                      spreadRadius: 0,
+                      offset: Offset(0, (12.0 * clampedScale).clamp(8.0, 18.0)),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Top Row: QR Icon + Arrow
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Animated QR Code Icon
+                        Container(
+                              padding: EdgeInsets.all(iconPadding),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(
+                                  (20.0 * clampedScale).clamp(14.0, 28.0),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.qr_code_scanner_rounded,
+                                size: iconSize,
+                                color: Colors.white,
+                              ),
+                            )
+                            .animate(
+                              onPlay: (controller) => controller.repeat(),
+                            )
+                            .scale(
+                              begin: const Offset(1.0, 1.0),
+                              end: const Offset(1.05, 1.05),
+                              duration: 1500.ms,
+                              curve: Curves.easeInOut,
+                            )
+                            .then()
+                            .scale(
+                              begin: const Offset(1.05, 1.05),
+                              end: const Offset(1.0, 1.0),
+                              duration: 1500.ms,
+                              curve: Curves.easeInOut,
                             ),
-                          ],
+
+                        // Arrow indicator
+                        Container(
+                          padding: EdgeInsets.all(arrowPadding),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: arrowSize,
+                          ),
                         ),
+                      ],
+                    ),
+
+                    // Bottom Section: Title + Subtitle (Constrained with FittedBox)
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: screenWidth * 0.85,
+                              ),
+                              child: Text(
+                                'TAP TO SCAN',
+                                style: TextStyle(
+                                  fontSize: titleSize,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: (1.5 * clampedScale).clamp(
+                                    0.8,
+                                    2.0,
+                                  ),
+                                  height: 1.0,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: titleSubtitleSpacing),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: screenWidth * 0.85,
+                              ),
+                              child: Text(
+                                isAdmin
+                                    ? 'Add Book / Checkout / Return'
+                                    : 'Checkout / Return / View Info',
+                                style: TextStyle(
+                                  fontSize: subtitleSize,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  letterSpacing: (0.6 * clampedScale).clamp(
+                                    0.3,
+                                    1.0,
+                                  ),
+                                  height: 1.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  SizedBox(height: titleSubtitleSpacing),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: screenWidth * 0.85),
-                      child: Text(
-                        isAdmin
-                            ? 'Add Book / Checkout / Return'
-                            : 'Checkout / Return / View Info',
-                        style: TextStyle(
-                          fontSize: subtitleSize,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.95),
-                          letterSpacing: (0.6 * clampedScale).clamp(0.3, 1.0),
-                          height: 1.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              )
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 400.ms)
+              .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic)
+              .shimmer(
+                delay: 800.ms,
+                duration: 1500.ms,
+                color: Colors.white.withValues(alpha: 0.15),
               ),
-            ),
-          ],
-        ),
-      )
-          .animate()
-          .fadeIn(delay: 200.ms, duration: 400.ms)
-          .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic)
-          .shimmer(delay: 800.ms, duration: 1500.ms, color: Colors.white.withValues(alpha: 0.15)),
     );
   }
 
@@ -692,8 +893,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       data: (books) {
         // Calculate library-wide stats (since we don't track borrower email, only name)
         final totalBooks = books.length;
-        final availableCount = books.where((b) => b.status == BookStatus.available).length;
-        final checkedOutCount = books.where((b) => b.status == BookStatus.checkedOut).length;
+        final availableCount = books
+            .where((b) => b.status == BookStatus.available)
+            .length;
+        final checkedOutCount = books
+            .where((b) => b.status == BookStatus.checkedOut)
+            .length;
         final overdueCount = books.where((b) => b.isOverdue).length;
 
         return Container(
@@ -718,7 +923,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             children: [
               Row(
                 children: [
-                  Icon(Icons.auto_graph_rounded, color: AppColors.primaryTeal, size: 24.sp),
+                  Icon(
+                    Icons.auto_graph_rounded,
+                    color: AppColors.primaryTeal,
+                    size: 24.sp,
+                  ),
                   SizedBox(width: 12.w),
                   Text(
                     'Library Quick Stats',
@@ -836,113 +1045,132 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     } else {
       // Show sign-in prompt when not connected
       return Container(
-        padding: EdgeInsets.all((16.0 * scale).clamp(12.0, 26.0)),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primaryTeal.withValues(alpha: 0.1),
-              AppColors.primaryLime.withValues(alpha: 0.1),
-            ],
-          ),
-          borderRadius: BorderRadius.circular((16.0 * scale).clamp(14.0, 28.0)),
-          border: Border.all(
-            color: AppColors.primaryTeal.withValues(alpha: 0.3),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
+            padding: EdgeInsets.all((16.0 * scale).clamp(12.0, 26.0)),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primaryTeal.withValues(alpha: 0.1),
+                  AppColors.primaryLime.withValues(alpha: 0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(
+                (16.0 * scale).clamp(14.0, 28.0),
+              ),
+              border: Border.all(
+                color: AppColors.primaryTeal.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Column(
               children: [
-                Icon(
-                  Icons.cloud_off_rounded,
-                  color: AppColors.warningLight,
-                  size: (24.0 * scale).clamp(20.0, 34.0),
-                ),
-                SizedBox(width: (12.0 * scale).clamp(10.0, 18.0)),
-                Expanded(
-                  child: Text(
-                    'Sign in to access library',
-                    style: TextStyle(
-                      fontSize: (16.0 * scale).clamp(14.0, 24.0),
-                      fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      color: AppColors.warningLight,
+                      size: (24.0 * scale).clamp(20.0, 34.0),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    SizedBox(width: (12.0 * scale).clamp(10.0, 18.0)),
+                    Expanded(
+                      child: Text(
+                        'Sign in to access library',
+                        style: TextStyle(
+                          fontSize: (16.0 * scale).clamp(14.0, 24.0),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
+                SizedBox(height: (12.0 * scale).clamp(10.0, 18.0)),
+                SizedBox(
+                  width:
+                      double.infinity, // CRITICAL: Make button take full width!
+                  child: GradientButton(
+                    text: 'Sign In with Google',
+                    icon: Icons.login_rounded,
+                    height: (56.0 * scale).clamp(52.0, 72.0),
+                    fontSize: (16.0 * scale).clamp(14.0, 22.0),
+                    onPressed: () async {
+                      // Show loading dialog
+                      showPremiumLoadingDialog(
+                        context,
+                        message: 'Signing in with Google...',
+                      );
+
+                      try {
+                        final success = await GoogleSheetsService.instance
+                            .signIn();
+
+                        // Dismiss loading dialog
+                        if (mounted) Navigator.pop(context);
+
+                        if (!mounted) return;
+
+                        if (success) {
+                          // Refresh connection status to update UI
+                          ref.invalidate(sheetsConnectionProvider);
+
+                          // Show success dialog directly (no checkmark animation for sign-in)
+                          await showPremiumSuccessDialog(
+                            context,
+                            title: 'Welcome!',
+                            message:
+                                'Successfully connected to Google Sheets.\n\nYou can now access the library system.',
+                            icon: Icons.cloud_done_rounded,
+                            onPrimaryPressed: () {
+                              // Dialog will auto-close via Navigator.pop in the dialog itself
+                              // No additional navigation needed
+                            },
+                          );
+                        } else {
+                          // Sign-in failed
+                          await showPremiumErrorDialog(
+                            context,
+                            title: 'Sign-In Failed',
+                            message:
+                                'Could not connect to Google.\n\nPlease check:\n- Internet connection\n- Google account permissions\n- OAuth configuration',
+                            icon: Icons.error_rounded,
+                          );
+                        }
+                      } catch (e) {
+                        // Dismiss loading if showing
+                        if (mounted && Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+
+                        if (!mounted) return;
+
+                        // Check if it's a network error
+                        final isOfflineError = e.toString().contains(
+                          'NO_INTERNET',
+                        );
+
+                        // Show elegant error message
+                        await showPremiumErrorDialog(
+                          context,
+                          title: isOfflineError
+                              ? 'No Internet Connection'
+                              : 'Sign-In Error',
+                          message: isOfflineError
+                              ? 'Unable to connect to Google.\n\nPlease check your internet connection and try again.'
+                              : 'An error occurred during sign-in:\n\n${e.toString()}\n\nPlease check:\n- Internet connection\n- Google account permissions',
+                          icon: isOfflineError
+                              ? Icons.wifi_off_rounded
+                              : Icons.error_outline_rounded,
+                        );
+                      }
+                    },
+                  ),
+                ), // Close SizedBox wrapper
               ],
             ),
-            SizedBox(height: (12.0 * scale).clamp(10.0, 18.0)),
-            SizedBox(
-              width: double.infinity,  // CRITICAL: Make button take full width!
-              child: GradientButton(
-                text: 'Sign In with Google',
-                icon: Icons.login_rounded,
-                height: (56.0 * scale).clamp(52.0, 72.0),
-                fontSize: (16.0 * scale).clamp(14.0, 22.0),
-                onPressed: () async {
-                // Show loading dialog
-                showPremiumLoadingDialog(context, message: 'Signing in with Google...');
-
-                try {
-                  final success = await GoogleSheetsService.instance.signIn();
-
-                  // Dismiss loading dialog
-                  if (mounted) Navigator.pop(context);
-
-                  if (!mounted) return;
-
-                  if (success) {
-                    // Refresh connection status to update UI
-                    ref.invalidate(sheetsConnectionProvider);
-
-                    // Show success dialog directly (no checkmark animation for sign-in)
-                    await showPremiumSuccessDialog(
-                      context,
-                      title: 'Welcome!',
-                      message: 'Successfully connected to Google Sheets.\n\nYou can now access the library system.',
-                      icon: Icons.cloud_done_rounded,
-                      onPrimaryPressed: () {
-                        // Dialog will auto-close via Navigator.pop in the dialog itself
-                        // No additional navigation needed
-                      },
-                    );
-                  } else {
-                    // Sign-in failed
-                    await showPremiumErrorDialog(
-                      context,
-                      title: 'Sign-In Failed',
-                      message: 'Could not connect to Google.\n\nPlease check:\n- Internet connection\n- Google account permissions\n- OAuth configuration',
-                      icon: Icons.error_rounded,
-                    );
-                  }
-                } catch (e) {
-                  // Dismiss loading if showing
-                  if (mounted && Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
-
-                  if (!mounted) return;
-
-                  // Check if it's a network error
-                  final isOfflineError = e.toString().contains('NO_INTERNET');
-
-                  // Show elegant error message
-                  await showPremiumErrorDialog(
-                    context,
-                    title: isOfflineError ? 'No Internet Connection' : 'Sign-In Error',
-                    message: isOfflineError
-                        ? 'Unable to connect to Google.\n\nPlease check your internet connection and try again.'
-                        : 'An error occurred during sign-in:\n\n${e.toString()}\n\nPlease check:\n- Internet connection\n- Google account permissions',
-                    icon: isOfflineError ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
-                  );
-                }
-              },
-            ),
-            ),  // Close SizedBox wrapper
-          ],
-        ),
-      ).animate().fadeIn(duration: 200.ms).slideY(begin: -0.1, end: 0).shake(delay: 300.ms, hz: 2, duration: 400.ms);
+          )
+          .animate()
+          .fadeIn(duration: 200.ms)
+          .slideY(begin: -0.1, end: 0)
+          .shake(delay: 300.ms, hz: 2, duration: 400.ms);
     }
   }
 
@@ -961,16 +1189,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
       if (password == null) return;
 
-      final verified = await ref.read(adminModeProvider.notifier).verifyAdminPassword(password);
+      final verified = await ref
+          .read(adminModeProvider.notifier)
+          .verifyAdminPassword(password);
 
       if (!dialogContext.mounted) return;
 
       if (verified) {
         await ref.read(adminModeProvider.notifier).setAdminMode(true);
         if (dialogContext.mounted) {
-          ScaffoldMessenger.of(dialogContext).showSnackBar(
-            const SnackBar(content: Text('Admin mode activated')),
-          );
+          ScaffoldMessenger.of(
+            dialogContext,
+          ).showSnackBar(const SnackBar(content: Text('Admin mode activated')));
         }
       } else {
         if (dialogContext.mounted) {
@@ -1024,5 +1254,3 @@ class _AdminPasswordDialogState extends State<_AdminPasswordDialog> {
     );
   }
 }
-
-
