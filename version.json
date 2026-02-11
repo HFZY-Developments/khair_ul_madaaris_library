@@ -6,11 +6,14 @@
   "fileSize": "72.8 MB",
   "mandatory": true,
   "changelog": [
-    "Fixed overdue return glitch in scanner flow",
-    "Improved scanner dialog stability and route handling",
-    "Prevented wrong-row updates in Google Sheets sync",
-    "Added strict APK integrity verification before install",
-    "Refined premium visuals on Home, Scanner, and Update dialog"
+    "Fixed scanner return/checkout glitch and success-dialog extra-pop navigation issues",
+    "Overdue books are now consistently returnable",
+    "Prevented wrong-row Google Sheets updates with exact row lookup and duplicate-ID protection",
+    "Added strict APK SHA-256 verification (install blocked on missing/mismatch hash)",
+    "Hardened release signing configuration for production builds",
+    "Upgraded Flutter/Android toolchain and dependencies to latest compatible versions",
+    "Added focused regression tests for scanner flow, row mapping, and update integrity",
+    "Applied subtle premium UI polish and background motion on Home, Scanner, and Update dialog"
   ],
   "minAndroidVersion": 21,
   "sha256": "aa845bad38d70003db8f967e3e042e4efa2d5782633f49138077118af4530fec"
